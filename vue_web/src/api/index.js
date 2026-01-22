@@ -1,0 +1,142 @@
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
+import router from '@/router'
+
+// 创建 axios 实例
+const api = axios.create({
+  baseURL: 'http://localhost:5000/api',
+  timeout: 600000,
+  headers: {
+    'Content-Type': 'application/json'
+  }
+})
+
+// 请求拦截器
+api.interceptors.request.use(
+  (config) => {
+    // 添加token到请求头
+    const token = localStorage.getItem('accessToken')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 响应拦截器
+api.interceptors.response.use(
+  (response) => {
+    // 如果是 blob 类型响应（文件下载），直接返回数据
+    if (response.config.responseType === 'blob') {
+      return response.data
+    }
+    
+    const { data } = response
+    if (data.code !== 0) {
+      ElMessage.error(data.message || '请求失败')
+      return Promise.reject(new Error(data.message))
+    }
+    return data
+  },
+  (error) => {
+    const status = error.response?.status
+    const message = error.response?.data?.message || error.message || '网络错误'
+    
+    // 处理401未授权
+    if (status === 401) {
+      localStorage.removeItem('accessToken')
+      localStorage.removeItem('refreshToken')
+      localStorage.removeItem('userInfo')
+      router.push('/login')
+      ElMessage.error('登录已过期，请重新登录')
+    } else {
+      ElMessage.error(message)
+    }
+    return Promise.reject(error)
+  }
+)
+
+// 认证相关 API
+export const authApi = {
+  login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
+  logout: () => api.post('/auth/logout'),
+  getProfile: () => api.get('/auth/profile'),
+  updateProfile: (data) => api.put('/auth/profile', data),
+  changePassword: (data) => api.post('/auth/change-password', data),
+  resetPassword: (data) => api.post('/auth/reset-password', data),
+  refreshToken: () => api.post('/auth/refresh')
+}
+
+// 需求相关 API
+export const requirementApi = {
+  getList: (params) => api.get('/requirements', { params }),
+  getDetail: (id) => api.get(`/requirements/${id}`),
+  create: (data) => api.post('/requirements', data),
+  update: (id, data) => api.put(`/requirements/${id}`, data),
+  delete: (id) => api.delete(`/requirements/${id}`),
+  getModules: () => api.get('/requirements/modules')
+}
+
+// 测试用例相关 API
+export const testcaseApi = {
+  getList: (params) => api.get('/testcases', { params }),
+  getDetail: (id) => api.get(`/testcases/${id}`),
+  create: (data) => api.post('/testcases', data),
+  createBatch: (data) => api.post('/testcases/batch', data),
+  update: (id, data) => api.put(`/testcases/${id}`, data),
+  delete: (id) => api.delete(`/testcases/${id}`),
+  getStats: () => api.get('/testcases/stats'),
+  // 导出测试用例
+  export: (params) => api.get('/testcases/export', { 
+    params, 
+    responseType: 'blob',
+    transformResponse: [(data) => data] // 不进行 JSON 解析
+  }),
+  // 下载导入模板
+  downloadTemplate: () => api.get('/testcases/template', { 
+    responseType: 'blob',
+    transformResponse: [(data) => data]
+  }),
+  // 导入测试用例
+  import: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/testcases/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
+
+// AI 相关 API
+export const aiApi = {
+  generate: (data) => api.post('/ai/generate', data),
+  preview: (data) => api.post('/ai/preview', data)
+}
+
+// 提示词相关 API
+export const promptApi = {
+  getList: (params) => api.get('/prompts', { params }),
+  getAll: () => api.get('/prompts/all'),
+  getDetail: (id) => api.get(`/prompts/${id}`),
+  create: (data) => api.post('/prompts', data),
+  update: (id, data) => api.put(`/prompts/${id}`, data),
+  delete: (id) => api.delete(`/prompts/${id}`),
+  setDefault: (id) => api.put(`/prompts/${id}/default`)
+}
+
+// 知识库相关 API
+export const knowledgeApi = {
+  getList: (params) => api.get('/knowledges', { params }),
+  getAll: () => api.get('/knowledges/all'),
+  getDetail: (id) => api.get(`/knowledges/${id}`),
+  create: (data) => api.post('/knowledges', data),
+  update: (id, data) => api.put(`/knowledges/${id}`, data),
+  delete: (id) => api.delete(`/knowledges/${id}`),
+  getBatch: (ids) => api.get('/knowledges/batch', { params: { ids: ids.join(',') } })
+}
+
+export default api

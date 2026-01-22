@@ -1,0 +1,50 @@
+/* 全局样式重置 */
+:root {
+  --el-color-primary: #409eff;
+}
+
+/* 滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #c0c4cc;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #909399;
+}
+
+::-webkit-scrollbar-track {
+  background-color: #f5f7fa;
+}
+
+/* Element Plus 覆盖样式 */
+.el-card__header {
+  padding: 12px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.el-table th.el-table__cell {
+  background-color: #f5f7fa;
+}
+
+/* 通用工具类 */
+.text-center {
+  text-align: center;
+}
+
+.text-right {
+  text-align: right;
+}
+
+.mb-16 {
+  margin-bottom: 16px;
+}
+
+.mt-16 {
+  margin-top: 16px;
+}
