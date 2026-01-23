@@ -68,7 +68,11 @@ export const authApi = {
   updateProfile: (data) => api.put('/auth/profile', data),
   changePassword: (data) => api.post('/auth/change-password', data),
   resetPassword: (data) => api.post('/auth/reset-password', data),
-  refreshToken: () => api.post('/auth/refresh')
+  refreshToken: () => api.post('/auth/refresh'),
+  // 获取用户菜单
+  getUserMenus: () => api.get('/permission/user/menus'),
+  // 获取用户权限
+  getUserPermissions: () => api.get('/permission/user/permissions')
 }
 
 // 需求相关 API
@@ -125,7 +129,20 @@ export const promptApi = {
   create: (data) => api.post('/prompts', data),
   update: (id, data) => api.put(`/prompts/${id}`, data),
   delete: (id) => api.delete(`/prompts/${id}`),
-  setDefault: (id) => api.put(`/prompts/${id}/default`)
+  setDefault: (id) => api.put(`/prompts/${id}/default`),
+  // 导入导出
+  export: (ids) => api.get('/prompts/export', { 
+    params: ids ? { ids: ids.join(',') } : {},
+    responseType: 'blob'
+  }),
+  downloadTemplate: () => api.get('/prompts/template', { responseType: 'blob' }),
+  import: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/prompts/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
 }
 
 // 知识库相关 API
@@ -136,7 +153,64 @@ export const knowledgeApi = {
   create: (data) => api.post('/knowledges', data),
   update: (id, data) => api.put(`/knowledges/${id}`, data),
   delete: (id) => api.delete(`/knowledges/${id}`),
-  getBatch: (ids) => api.get('/knowledges/batch', { params: { ids: ids.join(',') } })
+  getBatch: (ids) => api.get('/knowledges/batch', { params: { ids: ids.join(',') } }),
+  // 导入导出
+  export: (ids) => api.get('/knowledges/export', { 
+    params: ids ? { ids: ids.join(',') } : {},
+    responseType: 'blob'
+  }),
+  downloadTemplate: () => api.get('/knowledges/template', { responseType: 'blob' }),
+  import: (file) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/knowledges/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  }
+}
+
+// 大模型配置相关 API
+export const llmConfigApi = {
+  getList: (params) => api.get('/llm-configs', { params }),
+  getAll: () => api.get('/llm-configs/all'),
+  getDetail: (id) => api.get(`/llm-configs/${id}`),
+  create: (data) => api.post('/llm-configs', data),
+  update: (id, data) => api.put(`/llm-configs/${id}`, data),
+  delete: (id) => api.delete(`/llm-configs/${id}`),
+  setDefault: (id) => api.put(`/llm-configs/${id}/default`),
+  getProviders: () => api.get('/llm-configs/providers'),
+  fetchModels: (data) => api.post('/llm-configs/models', data),
+  testConfig: (data) => api.post('/llm-configs/test', data)
+}
+
+// 权限管理相关 API
+export const permissionApi = {
+  // 角色管理
+  getRoles: (params) => api.get('/permission/roles', { params }),
+  getAllRoles: () => api.get('/permission/roles/all'),
+  getRole: (id) => api.get(`/permission/roles/${id}`),
+  createRole: (data) => api.post('/permission/roles', data),
+  updateRole: (id, data) => api.put(`/permission/roles/${id}`, data),
+  deleteRole: (id) => api.delete(`/permission/roles/${id}`),
+  
+  // 权限管理
+  getPermissions: (params) => api.get('/permission/permissions', { params }),
+  getAllPermissions: () => api.get('/permission/permissions/all'),
+  createPermission: (data) => api.post('/permission/permissions', data),
+  updatePermission: (id, data) => api.put(`/permission/permissions/${id}`, data),
+  deletePermission: (id) => api.delete(`/permission/permissions/${id}`),
+  
+  // 菜单管理
+  getMenus: () => api.get('/permission/menus'),
+  getAllMenus: () => api.get('/permission/menus/all'),
+  getMenu: (id) => api.get(`/permission/menus/${id}`),
+  createMenu: (data) => api.post('/permission/menus', data),
+  updateMenu: (id, data) => api.put(`/permission/menus/${id}`, data),
+  deleteMenu: (id) => api.delete(`/permission/menus/${id}`),
+  
+  // 用户角色管理
+  getUserRoles: (userId) => api.get(`/permission/users/${userId}/roles`),
+  setUserRoles: (userId, roleIds) => api.put(`/permission/users/${userId}/roles`, { roleIds })
 }
 
 export default api

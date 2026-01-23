@@ -12,6 +12,26 @@ from app.models import TestCase, Requirement
 testcase_bp = Blueprint('testcase', __name__)
 
 
+def ensure_string(value, separator='\n'):
+    """
+    确保值为字符串格式
+    如果是列表则使用分隔符连接为字符串
+    
+    Args:
+        value: 输入值，可能是字符串、列表或其他类型
+        separator: 列表连接分隔符，默认为换行符
+    
+    Returns:
+        字符串格式的值
+    """
+    if value is None:
+        return ''
+    if isinstance(value, list):
+        # 将列表元素转换为字符串并连接
+        return separator.join(str(item) for item in value)
+    return str(value)
+
+
 @testcase_bp.route('', methods=['GET'])
 def get_testcases():
     """获取测试用例列表"""
@@ -82,17 +102,16 @@ def create_testcase():
     if not requirement:
         return jsonify({'code': 404, 'message': '关联需求不存在'}), 404
 
-    # 处理 steps 字段 - 如果是列表则转换为字符串
-    steps = data['steps']
-    if isinstance(steps, list):
-        steps = '; '.join(steps)  # 或者使用 '\n'.join(steps)
+    # 处理 steps 和 expected_result 字段 - 如果是列表则转换为字符串
+    steps = ensure_string(data['steps'])
+    expected_result = ensure_string(data['expected_result'])
 
     testcase = TestCase(
         requirement_id=data['requirement_id'],
         title=data['title'],
         precondition=data.get('precondition', ''),
-        steps=steps,  # 使用处理后的字符串
-        expected_result=data['expected_result'],
+        steps=steps,
+        expected_result=expected_result,
         case_type=data.get('case_type', 'functional'),
         priority=data.get('priority', 'medium'),
         status=data.get('status', 'pending'),
@@ -120,16 +139,15 @@ def create_testcases_batch():
     
     created_testcases = []
     for tc_data in testcases_data:
-        # 处理 steps 字段 - 如果是列表则转换为字符串
-        steps = tc_data['steps']
-        if isinstance(steps, list):
-            steps = '; '.join(steps)  # 或者使用 '\n'.join(steps)
+        # 处理 steps 和 expected_result 字段 - 如果是列表则转换为字符串
+        steps = ensure_string(tc_data['steps'])
+        expected_result = ensure_string(tc_data['expected_result'])
         testcase = TestCase(
             requirement_id=tc_data['requirement_id'],
             title=tc_data['title'],
             precondition=tc_data.get('precondition', ''),
             steps=steps,
-            expected_result=tc_data['expected_result'],
+            expected_result=expected_result,
             case_type=tc_data.get('case_type', 'functional'),
             priority=tc_data.get('priority', 'medium'),
             status='pending',
@@ -158,9 +176,9 @@ def update_testcase(testcase_id):
     if 'precondition' in data:
         testcase.precondition = data['precondition']
     if 'steps' in data:
-        testcase.steps = data['steps']
+        testcase.steps = ensure_string(data['steps'])
     if 'expected_result' in data:
-        testcase.expected_result = data['expected_result']
+        testcase.expected_result = ensure_string(data['expected_result'])
     if 'case_type' in data:
         testcase.case_type = data['case_type']
     if 'priority' in data:

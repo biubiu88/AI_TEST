@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usePromptStore } from '@/stores/prompt'
+import { UploadFilled, WarningFilled } from '@element-plus/icons-vue'
 
 const store = usePromptStore()
 
@@ -178,6 +179,86 @@ const getCategoryType = (category) => {
   return types[category] || ''
 }
 
+// 导入导出相关
+const importVisible = ref(false)
+const importLoading = ref(false)
+const importFile = ref(null)
+const uploadRef = ref(null)
+const importResult = ref(null)
+
+// 下载模板
+const handleDownloadTemplate = async () => {
+  try {
+    const blob = await store.downloadTemplate()
+    downloadFile(blob, '提示词导入模板.xlsx')
+    ElMessage.success('模板下载成功')
+  } catch (e) {
+    ElMessage.error('下载模板失败')
+  }
+}
+
+// 导出数据
+const handleExport = async () => {
+  try {
+    const blob = await store.exportPrompts()
+    downloadFile(blob, `提示词_${new Date().toISOString().slice(0, 10)}.xlsx`)
+    ElMessage.success('导出成功')
+  } catch (e) {
+    ElMessage.error('导出失败')
+  }
+}
+
+// 打开导入对话框
+const handleOpenImport = () => {
+  importFile.value = null
+  importResult.value = null
+  importVisible.value = true
+}
+
+// 文件选择变化
+const handleFileChange = (file) => {
+  importFile.value = file.raw
+}
+
+// 执行导入
+const handleImport = async () => {
+  if (!importFile.value) {
+    ElMessage.warning('请先选择文件')
+    return
+  }
+  
+  importLoading.value = true
+  try {
+    const result = await store.importPrompts(importFile.value)
+    importResult.value = result.data || result
+    ElMessage.success(result.message || '导入成功')
+    loadData()
+  } catch (e) {
+    ElMessage.error('导入失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+// 关闭导入对话框
+const handleCloseImport = () => {
+  importVisible.value = false
+  importFile.value = null
+  importResult.value = null
+}
+
+// 下载文件工具函数
+const downloadFile = (blob, filename) => {
+  const url = window.URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  window.URL.revokeObjectURL(url)
+  document.body.removeChild(a)
+}
+
 onMounted(() => {
   loadData()
 })
@@ -230,10 +311,24 @@ onMounted(() => {
       <template #header>
         <div class="card-header">
           <span>提示词列表</span>
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            新建提示词
-          </el-button>
+          <div class="header-actions">
+            <el-button @click="handleDownloadTemplate">
+              <el-icon><Download /></el-icon>
+              下载模板
+            </el-button>
+            <el-button type="info" @click="handleOpenImport">
+              <el-icon><Upload /></el-icon>
+              导入
+            </el-button>
+            <el-button type="warning" @click="handleExport">
+              <el-icon><Download /></el-icon>
+              导出
+            </el-button>
+            <el-button type="primary" @click="handleAdd">
+              <el-icon><Plus /></el-icon>
+              新建提示词
+            </el-button>
+          </div>
         </div>
       </template>
 
@@ -293,6 +388,71 @@ onMounted(() => {
         />
       </div>
     </el-card>
+
+    <!-- 导入对话框 -->
+    <el-dialog
+      v-model="importVisible"
+      title="导入提示词"
+      width="550px"
+      :close-on-click-modal="false"
+      @close="handleCloseImport"
+    >
+      <div class="import-content">
+        <el-alert
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 16px"
+        >
+          <template #title>
+            请先<el-link type="primary" @click="handleDownloadTemplate">下载导入模板</el-link>，按照模板格式填写数据后再上传
+          </template>
+        </el-alert>
+        
+        <el-upload
+          ref="uploadRef"
+          class="import-upload"
+          drag
+          :auto-upload="false"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :on-change="handleFileChange"
+          :on-exceed="() => ElMessage.warning('只能上传一个文件')"
+        >
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">
+            将文件拖到此处，或<em>点击上传</em>
+          </div>
+          <template #tip>
+            <div class="el-upload__tip">只支持 .xlsx 或 .xls 格式的 Excel 文件</div>
+          </template>
+        </el-upload>
+        
+        <!-- 导入结果 -->
+        <div v-if="importResult" class="import-result">
+          <el-divider>导入结果</el-divider>
+          <div class="result-summary">
+            <el-tag type="success">成功: {{ importResult.success_count || importResult.imported || 0 }} 条</el-tag>
+            <el-tag v-if="importResult.errors?.length" type="danger" style="margin-left: 8px">
+              失败: {{ importResult.errors.length }} 条
+            </el-tag>
+          </div>
+          <div v-if="importResult.errors?.length" class="error-list">
+            <div v-for="(error, index) in importResult.errors" :key="index" class="error-item">
+              <el-icon color="#f56c6c"><WarningFilled /></el-icon>
+              {{ error }}
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="handleCloseImport">关闭</el-button>
+        <el-button type="primary" :loading="importLoading" @click="handleImport">
+          开始导入
+        </el-button>
+      </template>
+    </el-dialog>
 
     <!-- 新建/编辑对话框 -->
     <el-dialog
@@ -379,9 +539,51 @@ onMounted(() => {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .pagination-wrapper {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.import-content {
+  padding: 0 10px;
+}
+
+.import-upload {
+  width: 100%;
+}
+
+.import-upload :deep(.el-upload-dragger) {
+  width: 100%;
+}
+
+.import-result {
+  margin-top: 16px;
+}
+
+.result-summary {
+  margin-bottom: 12px;
+}
+
+.error-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: #fef0f0;
+  border-radius: 4px;
+  padding: 12px;
+}
+
+.error-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #f56c6c;
 }
 </style>

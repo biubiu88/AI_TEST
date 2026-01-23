@@ -49,6 +49,13 @@ mysql -h 192.168.40.128 -u root -p < init_db.sql
 flask --app run:app init-db
 ```
 
+# 方式1: 使用Python脚本初始化（推荐）
+cd backend
+python init_db.py
+
+# 方式2: 使用SQL文件初始化
+mysql -u root -p < init_db.sql
+
 ### 4. 启动服务
 
 ```bash

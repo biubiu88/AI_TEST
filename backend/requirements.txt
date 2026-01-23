@@ -17,4 +17,5 @@ PyPDF2==3.0.1
 
 # AI 集成 (可选，用于调用AI API)
 openai>=1.10.0
+httpx>=0.25.0
 requests==2.31.0

@@ -29,7 +29,7 @@ def create_app(config_name: str = 'default') -> Flask:
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     
     # 注册蓝图
-    from app.routes import requirement_bp, testcase_bp, ai_bp, prompt_bp, knowledge_bp
+    from app.routes import requirement_bp, testcase_bp, ai_bp, prompt_bp, knowledge_bp, llm_config_bp, permission_bp
     from app.routes.auth import auth_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
@@ -38,6 +38,8 @@ def create_app(config_name: str = 'default') -> Flask:
     app.register_blueprint(ai_bp, url_prefix='/api/ai')
     app.register_blueprint(prompt_bp, url_prefix='/api/prompts')
     app.register_blueprint(knowledge_bp, url_prefix='/api/knowledges')
+    app.register_blueprint(llm_config_bp, url_prefix='/api/llm-configs')
+    app.register_blueprint(permission_bp, url_prefix='/api/permission')
     
     # 健康检查路由
     @app.route('/api/health')

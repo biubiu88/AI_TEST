@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { authApi } from '@/api'
 import { ElMessage } from 'element-plus'
+import { usePermissionStore } from './permission'
 
 export const useUserStore = defineStore('user', {
   state: () => ({
@@ -13,7 +14,11 @@ export const useUserStore = defineStore('user', {
   getters: {
     getUserInfo: (state) => state.userInfo,
     getToken: (state) => state.token,
-    isAuthenticated: (state) => state.isLoggedIn && !!state.token
+    isAuthenticated: (state) => state.isLoggedIn && !!state.token,
+    // 获取用户角色
+    getRoles: (state) => state.userInfo?.roles || [],
+    // 是否是管理员
+    isAdmin: (state) => state.userInfo?.roles?.includes('admin') || false
   },
 
   actions: {
@@ -21,7 +26,7 @@ export const useUserStore = defineStore('user', {
     async login(loginData) {
       try {
         const res = await authApi.login(loginData)
-        const { accessToken, refreshToken, user } = res.data
+        const { accessToken, refreshToken, user, menus, permissions } = res.data
         
         this.token = accessToken
         this.refreshToken = refreshToken
@@ -32,6 +37,11 @@ export const useUserStore = defineStore('user', {
         localStorage.setItem('refreshToken', refreshToken)
         localStorage.setItem('userInfo', JSON.stringify(user))
         localStorage.setItem('userName', user.nickname || user.username)
+        
+        // 设置权限和菜单
+        const permissionStore = usePermissionStore()
+        permissionStore.setMenus(menus)
+        permissionStore.setPermissions(permissions)
         
         return res
       } catch (error) {
@@ -57,6 +67,10 @@ export const useUserStore = defineStore('user', {
         // 忽略登出错误
       } finally {
         this.clearAuth()
+        // 清除权限信息
+        const permissionStore = usePermissionStore()
+        permissionStore.clearPermissions()
+        permissionStore.resetRoutes()
       }
     },
 
@@ -71,6 +85,10 @@ export const useUserStore = defineStore('user', {
       localStorage.removeItem('refreshToken')
       localStorage.removeItem('userInfo')
       localStorage.removeItem('userName')
+      
+      // 清除权限信息
+      const permissionStore = usePermissionStore()
+      permissionStore.clearPermissions()
     },
 
     // 获取用户信息

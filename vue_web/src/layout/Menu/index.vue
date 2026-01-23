@@ -12,12 +12,23 @@
       :unique-opened="expandOneMenu"
       @select="handleMenuSelect"
     >
-      <template v-for="item in menuItems" :key="item.path">
-        <el-menu-item :index="item.path">
-          <el-icon>
-            <component :is="item.icon" />
+      <template v-for="item in menuList" :key="item.path || item.name">
+        <!-- 有子菜单 -->
+        <el-sub-menu v-if="item.children && item.children.length > 0 && !item.meta?.hidden" :index="item.path || item.name">
+          <template #title>
+            <el-icon v-if="item.meta?.icon">
+              <component :is="item.meta.icon" />
+            </el-icon>
+            <span>{{ item.meta?.title || item.name }}</span>
+          </template>
+          <menu-item :menu-list="item.children" />
+        </el-sub-menu>
+        <!-- 无子菜单 -->
+        <el-menu-item v-else-if="!item.meta?.hidden" :index="item.path">
+          <el-icon v-if="item.meta?.icon">
+            <component :is="item.meta.icon" />
           </el-icon>
-          <template #title>{{ item.title }}</template>
+          <template #title>{{ item.meta?.title || item.name }}</template>
         </el-menu-item>
       </template>
     </el-menu>
@@ -28,42 +39,27 @@
 import { computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { usePermissionStore } from '@/stores/permission'
+import { defaultAsyncRoutes } from '@/router'
+import MenuItem from './MenuItem.vue'
 
 const router = useRouter()
 const route = useRoute()
 const appStore = useAppStore()
+const permissionStore = usePermissionStore()
 
 const isCollapse = computed(() => appStore.isCollapse)
 const expandOneMenu = computed(() => appStore.expandOneMenu)
 
-// 菜单配置
-const menuItems = [
-  {
-    path: '/requirements',
-    icon: 'Document',
-    title: '需求管理'
-  },
-  {
-    path: '/testcases',
-    icon: 'List',
-    title: '测试用例'
-  },
-  {
-    path: '/generate',
-    icon: 'MagicStick',
-    title: '生成用例'
-  },
-  {
-    path: '/prompts',
-    icon: 'ChatDotRound',
-    title: '提示词管理'
-  },
-  {
-    path: '/knowledges',
-    icon: 'Collection',
-    title: '知识库管理'
+// 菜单配置 - 优先使用动态菜单，没有则使用默认菜单
+const menuList = computed(() => {
+  if (permissionStore.menus.length > 0) {
+    // 使用动态菜单
+    return permissionStore.menus
   }
-]
+  // 使用默认菜单
+  return defaultAsyncRoutes[0]?.children || []
+})
 
 // 主题配置相关的计算属性
 const menuBackgroundColor = computed(() => {

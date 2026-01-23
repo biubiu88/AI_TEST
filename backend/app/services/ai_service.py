@@ -1,30 +1,103 @@
 """
 AI 服务 - 测试用例生成
+
+采用工厂模式管理 LLM 客户端：
+- OpenAI SDK: 用于 OpenAI 官方服务
+- HTTPX: 用于其他兼容 OpenAI API 的服务
 """
 import json
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from flask import current_app
 
-try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
-except ImportError:
-    OPENAI_AVAILABLE = False
+from app.services.llm_clients import (
+    LLMClientFactory,
+    BaseLLMClient,
+    ChatMessage,
+    ChatResponse
+)
 
 
 class AIService:
-    """AI 服务类，用于生成测试用例"""
+    """
+    AI 服务类，用于生成测试用例
+    采用工厂模式支持多种 LLM 服务商
+    """
     
-    def __init__(self):
-        self.api_key = os.getenv('AI_API_KEY', '')
-        self.api_base = os.getenv('AI_API_BASE', 'https://api.openai.com/v1')
-        self.model = os.getenv('AI_MODEL', 'gpt-3.5-turbo')
+    def __init__(self, llm_config=None):
+        """
+        初始化 AI 服务
         
-        if OPENAI_AVAILABLE and self.api_key:
-            self.client = OpenAI(api_key=self.api_key, base_url=self.api_base)
+        Args:
+            llm_config: LLMConfig 对象，如果为 None 则使用默认配置或环境变量
+        """
+        self.llm_config = llm_config
+        self.client: Optional[BaseLLMClient] = None
+        
+        if llm_config:
+            # 使用传入的配置，通过工厂创建客户端
+            self.api_key = llm_config.api_key
+            self.api_base = llm_config.api_base
+            self.model = llm_config.model or 'gpt-3.5-turbo'
+            self.provider = llm_config.provider
+            
+            if self.api_key:
+                self.client = LLMClientFactory.create_from_config(llm_config)
         else:
-            self.client = None
+            # 使用环境变量配置（兼容旧版本）
+            self.api_key = os.getenv('AI_API_KEY', '')
+            self.api_base = os.getenv('AI_API_BASE', 'https://api.openai.com/v1')
+            self.model = os.getenv('AI_MODEL', 'gpt-3.5-turbo')
+            self.provider = os.getenv('AI_PROVIDER', 'openai')
+            
+            if self.api_key:
+                self.client = LLMClientFactory.create(
+                    provider=self.provider,
+                    api_key=self.api_key,
+                    api_base=self.api_base,
+                    model=self.model
+                )
+    
+    @classmethod
+    def from_config_id(cls, config_id: int):
+        """
+        根据配置ID创建AI服务实例
+        
+        Args:
+            config_id: 大模型配置ID
+        
+        Returns:
+            AIService 实例
+        """
+        from app.models import LLMConfig
+        config = LLMConfig.query.filter(
+            LLMConfig.id == config_id,
+            LLMConfig.is_active == True
+        ).first()
+        return cls(config)
+    
+    @classmethod
+    def get_default_service(cls):
+        """
+        获取默认配置的AI服务实例
+        
+        Returns:
+            AIService 实例
+        """
+        from app.models import LLMConfig
+        # 先尝试获取默认配置
+        config = LLMConfig.query.filter(
+            LLMConfig.is_default == True,
+            LLMConfig.is_active == True
+        ).first()
+        
+        # 如果没有默认配置，获取任一启用的配置
+        if not config:
+            config = LLMConfig.query.filter(
+                LLMConfig.is_active == True
+            ).first()
+        
+        return cls(config)
     
     def generate_testcases(self, requirement, options: Dict[str, Any], prompt_content: str = None, knowledge_contents: List[str] = None) -> List[Dict]:
         """
@@ -50,24 +123,26 @@ class AIService:
             return self._generate_with_template(requirement, options)
     
     def _generate_with_ai(self, requirement, options: Dict[str, Any], prompt_content: str = None, knowledge_contents: List[str] = None) -> List[Dict]:
-        """使用 AI API 生成测试用例"""
+        """使用 AI API 生成测试用例（通过工厂模式创建的客户端）"""
         prompt = self._build_prompt(requirement, options, knowledge_contents)
         
         # 构建系统提示词
         system_prompt = self._build_system_prompt(prompt_content)
         
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": prompt}
-                ],
+            # 使用统一的客户端接口
+            messages = [
+                ChatMessage(role="system", content=system_prompt),
+                ChatMessage(role="user", content=prompt)
+            ]
+            
+            response = self.client.chat(
+                messages=messages,
                 temperature=0.7,
                 max_tokens=4000
             )
             
-            content = response.choices[0].message.content.strip()
+            content = response.content
             # 尝试解析 JSON
             if content.startswith('```'):
                 content = content.split('```')[1]
@@ -78,7 +153,7 @@ class AIService:
             return testcases
             
         except Exception as e:
-            current_app.logger.error(f'AI API 调用失败: {str(e)}')
+            current_app.logger.error(f'AI API 调用失败 (provider={self.provider}): {str(e)}')
             # 降级使用模板生成
             return self._generate_with_template(requirement, options)
     

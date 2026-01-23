@@ -92,6 +92,39 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     }
   }
 
+  // 导出知识库
+  const exportKnowledges = async (ids = null) => {
+    try {
+      const blob = await knowledgeApi.export(ids)
+      return blob
+    } catch (error) {
+      console.error('导出知识库失败:', error)
+      throw error
+    }
+  }
+
+  // 下载导入模板
+  const downloadTemplate = async () => {
+    try {
+      const blob = await knowledgeApi.downloadTemplate()
+      return blob
+    } catch (error) {
+      console.error('下载模板失败:', error)
+      throw error
+    }
+  }
+
+  // 导入知识库
+  const importKnowledges = async (file) => {
+    try {
+      const res = await knowledgeApi.import(file)
+      return res.data
+    } catch (error) {
+      console.error('导入知识库失败:', error)
+      throw error
+    }
+  }
+
   return {
     knowledges,
     allKnowledges,
@@ -104,6 +137,9 @@ export const useKnowledgeStore = defineStore('knowledge', () => {
     createKnowledge,
     updateKnowledge,
     deleteKnowledge,
-    fetchKnowledgesBatch
+    fetchKnowledgesBatch,
+    exportKnowledges,
+    downloadTemplate,
+    importKnowledges
   }
 })

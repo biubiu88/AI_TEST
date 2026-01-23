@@ -7,13 +7,32 @@ import tempfile
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import Requirement, TestCase, Prompt, Knowledge
+from app.models import Requirement, TestCase, Prompt, Knowledge, LLMConfig
 from app.services.ai_service import AIService
 
 ai_bp = Blueprint('ai', __name__)
 
 # 支持的文档格式
 ALLOWED_EXTENSIONS = {'txt', 'doc', 'docx', 'pdf'}
+
+
+def ensure_string(value, separator='\n'):
+    """
+    确保值为字符串格式
+    如果是列表则使用分隔符连接为字符串
+    
+    Args:
+        value: 输入值，可能是字符串、列表或其他类型
+        separator: 列表连接分隔符，默认为换行符
+    
+    Returns:
+        字符串格式的值
+    """
+    if value is None:
+        return ''
+    if isinstance(value, list):
+        return separator.join(str(item) for item in value)
+    return str(value)
 
 
 def get_prompt_and_knowledge(data):
@@ -130,18 +149,27 @@ def generate_testcases():
         # 获取提示词和知识库
         prompt_content, knowledge_contents = get_prompt_and_knowledge(data)
         
-        ai_service = AIService()
+        # 获取AI服务实例
+        llm_config_id = data.get('llm_config_id')
+        if llm_config_id:
+            ai_service = AIService.from_config_id(llm_config_id)
+        else:
+            ai_service = AIService.get_default_service()
+        
         testcases = ai_service.generate_testcases(requirement, options, prompt_content, knowledge_contents)
         
         # 保存生成的测试用例
         saved_testcases = []
         for tc_data in testcases:
+            # 处理 steps 和 expected_result 字段 - 如果是列表则转换为字符串
+            steps = ensure_string(tc_data.get('steps', ''))
+            expected_result = ensure_string(tc_data.get('expected_result', ''))
             testcase = TestCase(
                 requirement_id=requirement_id,  # 如果是文本输入，则为 None
                 title=tc_data['title'],
                 precondition=tc_data.get('precondition', ''),
-                steps=tc_data['steps'],
-                expected_result=tc_data['expected_result'],
+                steps=steps,
+                expected_result=expected_result,
                 case_type=tc_data.get('case_type', 'functional'),
                 priority=tc_data.get('priority', 'medium'),
                 status='pending',
@@ -199,7 +227,13 @@ def preview_testcases():
         # 获取提示词和知识库
         prompt_content, knowledge_contents = get_prompt_and_knowledge(data)
         
-        ai_service = AIService()
+        # 获取AI服务实例
+        llm_config_id = data.get('llm_config_id')
+        if llm_config_id:
+            ai_service = AIService.from_config_id(llm_config_id)
+        else:
+            ai_service = AIService.get_default_service()
+        
         testcases = ai_service.generate_testcases(requirement, options, prompt_content, knowledge_contents)
         
         return jsonify({

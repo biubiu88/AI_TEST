@@ -6,6 +6,7 @@ import { useRequirementStore } from '@/stores/requirement'
 import { useTestcaseStore } from '@/stores/testcase'
 import { usePromptStore } from '@/stores/prompt'
 import { useKnowledgeStore } from '@/stores/knowledge'
+import { useLLMConfigStore } from '@/stores/llmConfig'
 import api from '@/api'
 
 const route = useRoute()
@@ -14,6 +15,7 @@ const requirementStore = useRequirementStore()
 const testcaseStore = useTestcaseStore()
 const promptStore = usePromptStore()
 const knowledgeStore = useKnowledgeStore()
+const llmConfigStore = useLLMConfigStore()
 
 // 需求输入方式: select-选择需求, text-文本输入, upload-上传文档
 const requirementInputType = ref('select')
@@ -28,7 +30,8 @@ const generateForm = reactive({
   include_performance: false,
   count: 10,
   prompt_id: '',
-  knowledge_ids: []
+  knowledge_ids: [],
+  llm_config_id: ''
 })
 
 // 上传的文件
@@ -52,6 +55,7 @@ onMounted(async () => {
   await requirementStore.fetchRequirements({ per_page: 1000 })
   await promptStore.fetchAllPrompts()
   await knowledgeStore.fetchAllKnowledges()
+  await llmConfigStore.fetchAllConfigs()
   
   // 如果有预选的需求，加载详情
   if (generateForm.requirement_id) {
@@ -62,6 +66,12 @@ onMounted(async () => {
   const defaultPrompt = promptStore.allPrompts.find(p => p.is_default)
   if (defaultPrompt) {
     generateForm.prompt_id = defaultPrompt.id
+  }
+  
+  // 设置默认大模型配置
+  const defaultLLMConfig = llmConfigStore.allConfigs.find(c => c.is_default)
+  if (defaultLLMConfig) {
+    generateForm.llm_config_id = defaultLLMConfig.id
   }
 })
 
@@ -125,7 +135,8 @@ const getGenerateData = () => {
     include_performance: generateForm.include_performance,
     count: generateForm.count,
     prompt_id: generateForm.prompt_id,
-    knowledge_ids: generateForm.knowledge_ids
+    knowledge_ids: generateForm.knowledge_ids,
+    llm_config_id: generateForm.llm_config_id
   }
   
   if (requirementInputType.value === 'select') {
@@ -470,6 +481,31 @@ const getPriorityLabel = (priority) => {
               AI 增强配置
             </el-divider>
             
+            <el-form-item label="大模型">
+              <el-select
+                v-model="generateForm.llm_config_id"
+                placeholder="选择大模型配置"
+                clearable
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="config in llmConfigStore.allConfigs"
+                  :key="config.id"
+                  :label="config.name"
+                  :value="config.id"
+                >
+                  <div class="llm-config-option">
+                    <span>{{ config.name }}</span>
+                    <div class="option-tags">
+                      <el-tag v-if="config.is_default" type="success" size="small">默认</el-tag>
+                      <el-tag type="info" size="small">{{ config.model || config.provider }}</el-tag>
+                    </div>
+                  </div>
+                </el-option>
+              </el-select>
+              <div class="form-tip">选择用于生成测试用例的AI大模型，不选择则使用默认配置</div>
+            </el-form-item>
+            
             <el-form-item label="提示词">
               <el-select
                 v-model="generateForm.prompt_id"
@@ -716,11 +752,17 @@ const getPriorityLabel = (priority) => {
 }
 
 .prompt-option,
-.knowledge-option {
+.knowledge-option,
+.llm-config-option {
   display: flex;
   justify-content: space-between;
   align-items: center;
   width: 100%;
+}
+
+.option-tags {
+  display: flex;
+  gap: 4px;
 }
 
 .form-tip {

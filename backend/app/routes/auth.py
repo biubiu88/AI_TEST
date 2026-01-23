@@ -8,7 +8,7 @@ from flask_jwt_extended import (
     jwt_required, get_jwt_identity, get_jwt
 )
 from app import db
-from app.models import User
+from app.models import User, Menu, Permission, Role
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -61,6 +61,11 @@ def register():
     )
     user.set_password(password)
     
+    # 分配默认角色（普通用户）
+    default_role = Role.query.filter_by(code='user').first()
+    if default_role:
+        user.roles.append(default_role)
+    
     db.session.add(user)
     db.session.commit()
     
@@ -96,17 +101,34 @@ def login():
     user.last_login = datetime.utcnow()
     db.session.commit()
     
+    # 获取用户角色编码
+    role_codes = user.get_role_codes()
+    
     # 创建JWT令牌
     access_token = create_access_token(
         identity=user.id,
-        additional_claims={'username': user.username, 'role': user.role}
+        additional_claims={'username': user.username, 'roles': role_codes}
     )
     refresh_token = create_refresh_token(identity=user.id)
+    
+    # 获取用户菜单
+    if 'admin' in role_codes:
+        menus = Menu.query.filter(Menu.status == 1).order_by(Menu.sort.asc()).all()
+    else:
+        menus = user.get_menus()
+    
+    # 获取用户权限
+    if 'admin' in role_codes:
+        permissions = [p.code for p in Permission.query.all()]
+    else:
+        permissions = user.get_permissions()
     
     return make_response(0, '登录成功', {
         'accessToken': access_token,
         'refreshToken': refresh_token,
-        'user': user.to_dict()
+        'user': user.to_dict(),
+        'menus': Menu.build_tree(menus),
+        'permissions': permissions
     })
 
 
@@ -120,9 +142,10 @@ def refresh():
     if not user:
         return make_response(401, '用户不存在')
     
+    role_codes = user.get_role_codes()
     access_token = create_access_token(
         identity=user.id,
-        additional_claims={'username': user.username, 'role': user.role}
+        additional_claims={'username': user.username, 'roles': role_codes}
     )
     
     return make_response(0, '刷新成功', {'accessToken': access_token})

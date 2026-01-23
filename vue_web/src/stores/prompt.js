@@ -92,6 +92,39 @@ export const usePromptStore = defineStore('prompt', () => {
     }
   }
 
+  // 导出提示词
+  const exportPrompts = async (ids = null) => {
+    try {
+      const blob = await promptApi.export(ids)
+      return blob
+    } catch (error) {
+      console.error('导出提示词失败:', error)
+      throw error
+    }
+  }
+
+  // 下载导入模板
+  const downloadTemplate = async () => {
+    try {
+      const blob = await promptApi.downloadTemplate()
+      return blob
+    } catch (error) {
+      console.error('下载模板失败:', error)
+      throw error
+    }
+  }
+
+  // 导入提示词
+  const importPrompts = async (file) => {
+    try {
+      const res = await promptApi.import(file)
+      return res.data
+    } catch (error) {
+      console.error('导入提示词失败:', error)
+      throw error
+    }
+  }
+
   return {
     prompts,
     allPrompts,
@@ -104,6 +137,9 @@ export const usePromptStore = defineStore('prompt', () => {
     createPrompt,
     updatePrompt,
     deletePrompt,
-    setDefaultPrompt
+    setDefaultPrompt,
+    exportPrompts,
+    downloadTemplate,
+    importPrompts
   }
 })
