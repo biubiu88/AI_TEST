@@ -213,4 +213,53 @@ export const permissionApi = {
   setUserRoles: (userId, roleIds) => api.put(`/permission/users/${userId}/roles`, { roleIds })
 }
 
+// 用户管理相关 API
+export const userApi = {
+  getList: (params) => api.get('/users', { params }),
+  getDetail: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  resetPassword: (id, password) => api.post(`/users/${id}/reset-password`, { password })
+}
+
+// 日志审计相关 API
+export const logApi = {
+  getList: (params) => api.get('/logs', { params }),
+  getDetail: (id) => api.get(`/logs/${id}`),
+  export: (params) => api.get('/logs/export', { params })
+}
+
+// MCP配置相关 API
+export const mcpApi = {
+  getList: (params) => api.get('/mcp-configs', { params }),
+  getAll: () => api.get('/mcp-configs/all'),
+  getDetail: (id) => api.get(`/mcp-configs/${id}`),
+  create: (data) => api.post('/mcp-configs', data),
+  update: (id, data) => api.put(`/mcp-configs/${id}`, data),
+  delete: (id) => api.delete(`/mcp-configs/${id}`),
+  test: (id) => api.post(`/mcp-configs/${id}/test`)
+}
+
+// AI助手相关 API
+export const aiAssistantApi = {
+  // 会话管理
+  getSessions: (params) => api.get('/ai-assistant/sessions', { params }),
+  createSession: (data) => api.post('/ai-assistant/sessions', data),
+  getSession: (id) => api.get(`/ai-assistant/sessions/${id}`),
+  updateSession: (id, data) => api.put(`/ai-assistant/sessions/${id}`, data),
+  deleteSession: (id) => api.delete(`/ai-assistant/sessions/${id}`),
+  
+  // 消息管理
+  getMessages: (sessionId) => api.get(`/ai-assistant/sessions/${sessionId}/messages`),
+  sendMessage: (sessionId, data) => api.post(`/ai-assistant/sessions/${sessionId}/messages`, data),
+  deleteMessage: (sessionId, messageId) => api.delete(`/ai-assistant/sessions/${sessionId}/messages/${messageId}`),
+  
+  // 配置选项
+  getKnowledgeBases: () => api.get('/ai-assistant/knowledge'),
+  getPrompts: () => api.get('/ai-assistant/prompts'),
+  getMcpConfigs: () => api.get('/ai-assistant/mcp-configs'),
+  getModels: () => api.get('/ai-assistant/models')
+}
+
 export default api

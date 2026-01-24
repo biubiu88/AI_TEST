@@ -31,6 +31,10 @@ def create_app(config_name: str = 'default') -> Flask:
     # 注册蓝图
     from app.routes import requirement_bp, testcase_bp, ai_bp, prompt_bp, knowledge_bp, llm_config_bp, permission_bp
     from app.routes.auth import auth_bp
+    from app.routes.users import users_bp
+    from app.routes.logs import logs_bp
+    from app.routes.mcp import mcp_bp
+    from app.routes.ai_assistant import ai_assistant_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(requirement_bp, url_prefix='/api/requirements')
@@ -40,6 +44,10 @@ def create_app(config_name: str = 'default') -> Flask:
     app.register_blueprint(knowledge_bp, url_prefix='/api/knowledges')
     app.register_blueprint(llm_config_bp, url_prefix='/api/llm-configs')
     app.register_blueprint(permission_bp, url_prefix='/api/permission')
+    app.register_blueprint(users_bp, url_prefix='/api/users')
+    app.register_blueprint(logs_bp, url_prefix='/api/logs')
+    app.register_blueprint(mcp_bp, url_prefix='/api/mcp-configs')
+    app.register_blueprint(ai_assistant_bp, url_prefix='/api/ai-assistant')
     
     # 健康检查路由
     @app.route('/api/health')

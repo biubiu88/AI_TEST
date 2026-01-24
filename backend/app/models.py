@@ -138,6 +138,36 @@ class Menu(db.Model):
                 tree.append(node)
         return sorted(tree, key=lambda x: x['sort'])
 
+    @staticmethod
+    def build_tree_with_parents(menus):
+        """构建菜单树，自动包含父菜单"""
+        # 收集所有菜单ID和父菜单ID
+        menu_ids = {menu.id for menu in menus}
+        parent_ids = {menu.parent_id for menu in menus if menu.parent_id != 0}
+
+        # 递归获取所有父菜单
+        all_menu_ids = set(menu_ids)
+        current_parent_ids = set(parent_ids)
+
+        while current_parent_ids:
+            # 查找当前父菜单的父菜单
+            new_parent_ids = set()
+            for parent_id in current_parent_ids:
+                if parent_id not in all_menu_ids:
+                    parent_menu = Menu.query.get(parent_id)
+                    if parent_menu and parent_menu.status == 1:
+                        all_menu_ids.add(parent_menu.id)
+                        if parent_menu.parent_id != 0:
+                            new_parent_ids.add(parent_menu.parent_id)
+
+            current_parent_ids = new_parent_ids
+
+        # 获取所有需要的菜单
+        all_menus = Menu.query.filter(Menu.id.in_(all_menu_ids), Menu.status == 1).all()
+
+        # 构建菜单树
+        return Menu.build_tree(all_menus, parent_id=0)
+
 
 class User(db.Model):
     """用户模型"""
@@ -363,3 +393,38 @@ class LLMConfig(db.Model):
             else:
                 result['api_key'] = '****'
         return result
+
+
+class MCPConfig(db.Model):
+    """MCP配置模型"""
+    __tablename__ = 'mcp_configs'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False, comment='配置名称')
+    server_url = db.Column(db.String(500), nullable=False, comment='MCP服务器地址')
+    server_name = db.Column(db.String(100), comment='服务器名称')
+    description = db.Column(db.String(500), comment='配置描述')
+    timeout = db.Column(db.Integer, default=30, comment='超时时间(秒)')
+    max_retries = db.Column(db.Integer, default=3, comment='最大重试次数')
+    status = db.Column(db.Integer, default=1, comment='状态: 1启用 0禁用')
+    is_default = db.Column(db.Boolean, default=False, comment='是否默认配置')
+    extra_params = db.Column(db.Text, comment='额外参数JSON')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'name': self.name,
+            'server_url': self.server_url,
+            'server_name': self.server_name,
+            'description': self.description,
+            'timeout': self.timeout,
+            'max_retries': self.max_retries,
+            'status': self.status,
+            'is_default': self.is_default,
+            'extra_params': self.extra_params,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }

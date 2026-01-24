@@ -114,20 +114,22 @@ def login():
     # 获取用户菜单
     if 'admin' in role_codes:
         menus = Menu.query.filter(Menu.status == 1).order_by(Menu.sort.asc()).all()
+        menu_tree = Menu.build_tree(menus)
     else:
         menus = user.get_menus()
-    
+        menu_tree = Menu.build_tree_with_parents(menus)
+
     # 获取用户权限
     if 'admin' in role_codes:
         permissions = [p.code for p in Permission.query.all()]
     else:
         permissions = user.get_permissions()
-    
+
     return make_response(0, '登录成功', {
         'accessToken': access_token,
         'refreshToken': refresh_token,
         'user': user.to_dict(),
-        'menus': Menu.build_tree(menus),
+        'menus': menu_tree,
         'permissions': permissions
     })
 

@@ -37,21 +37,36 @@ export const defaultAsyncRoutes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/requirements',
+    redirect: '/dashboard',
     name: 'Root',
     meta: { requiresAuth: true },
     children: [
       {
-        path: 'requirements',
-        name: 'Requirements',
-        component: () => import('@/views/RequirementView.vue'),
-        meta: { title: '需求管理', icon: 'Document' }
+        path: 'dashboard',
+        name: 'Home',
+        component: () => import('@/views/DashboardView.vue'),
+        meta: { title: '首页', icon: 'DataBoard' }
       },
+      {
+        path: 'ai-assistant',
+        name: 'AIAssistant',
+        component: () => import('@/views/AIAssistantView.vue'),
+        meta: { title: 'AI助手', icon: 'ChatLineRound' }
+      }
+    ]
+  },
+  {
+    path: '/testing',
+    component: Layout,
+    redirect: '/testing/testcases',
+    name: 'Testing',
+    meta: { requiresAuth: true },
+    children: [
       {
         path: 'testcases',
         name: 'TestCases',
         component: () => import('@/views/TestCaseView.vue'),
-        meta: { title: '测试用例', icon: 'List' }
+        meta: { title: '用例管理', icon: 'List' }
       },
       {
         path: 'generate',
@@ -60,22 +75,76 @@ export const defaultAsyncRoutes = [
         meta: { title: '生成用例', icon: 'MagicStick' }
       },
       {
-        path: 'prompts',
-        name: 'Prompts',
-        component: () => import('@/views/PromptView.vue'),
-        meta: { title: '提示词管理', icon: 'ChatDotRound' }
-      },
+        path: 'requirements',
+        name: 'Requirements',
+        component: () => import('@/views/RequirementView.vue'),
+        meta: { title: '需求管理', icon: 'Document' }
+      }
+    ]
+  },
+  {
+    path: '/knowledge',
+    component: Layout,
+    redirect: '/knowledge/knowledges',
+    name: 'Knowledge',
+    meta: { requiresAuth: true },
+    children: [
       {
         path: 'knowledges',
         name: 'Knowledges',
         component: () => import('@/views/KnowledgeView.vue'),
-        meta: { title: '知识库管理', icon: 'Collection' }
+        meta: { title: '知识库管理', icon: 'Reading' }
+      },
+      {
+        path: 'prompts',
+        name: 'Prompts',
+        component: () => import('@/views/PromptView.vue'),
+        meta: { title: '提示词管理', icon: 'ChatDotRound' }
+      }
+    ]
+  },
+  {
+    path: '/system',
+    component: Layout,
+    redirect: '/system/users',
+    name: 'System',
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'users',
+        name: 'Users',
+        component: () => import('@/views/UserView.vue'),
+        meta: { title: '用户管理', icon: 'User' }
+      },
+      {
+        path: 'roles',
+        name: 'Roles',
+        component: () => import('@/views/RoleView.vue'),
+        meta: { title: '角色管理', icon: 'UserFilled' }
+      },
+      {
+        path: 'menus',
+        name: 'Menus',
+        component: () => import('@/views/MenuView.vue'),
+        meta: { title: '菜单管理', icon: 'Menu' }
       },
       {
         path: 'llm-configs',
         name: 'LLMConfigs',
         component: () => import('@/views/LLMConfigView.vue'),
-        meta: { title: '大模型配置', icon: 'Setting' }
+        meta: { title: '大模型配置', icon: 'Connection' }
+      },
+      {
+        path: 'mcp-configs',
+        name: 'MCPConfigs',
+        component: () => import('@/views/MCPConfigView.vue'),
+        meta: { title: 'MCP配置', icon: 'Connection' }
+      },
+      {
+        path: 'logs',
+        name: 'Logs',
+        component: () => import('@/views/LogView.vue'),
+        meta: { title: '日志与审计', icon: 'DocumentCopy' }
       }
     ]
   }
@@ -109,21 +178,34 @@ router.beforeEach(async (to, from, next) => {
       const { usePermissionStore } = await import('@/stores/permission')
       const permissionStore = usePermissionStore()
       
-      if (!permissionStore.routesAdded) {
-        // 检查是否有菜单数据
-        if (permissionStore.menus.length === 0) {
-          // 使用默认路由
-          defaultAsyncRoutes.forEach(route => {
-            if (!router.hasRoute(route.name)) {
-              router.addRoute(route)
-            }
-          })
-          permissionStore.routesAdded = true
-        } else {
-          // 使用动态路由
-          await permissionStore.addDynamicRoutes()
+      // 检查是否是页面刷新（from.name为null表示是刷新）
+      const isPageRefresh = from.name === null
+      
+      if (isPageRefresh || !permissionStore.routesAdded) {
+        // 页面刷新时，重新获取最新的菜单和权限
+        if (isPageRefresh) {
+          try {
+            await permissionStore.fetchPermissions()
+            // 重新添加动态路由
+            permissionStore.resetRoutes()
+          } catch (error) {
+            console.error('刷新权限失败:', error)
+          }
         }
         
+        // 总是添加默认路由
+        defaultAsyncRoutes.forEach(route => {
+          if (!router.hasRoute(route.name)) {
+            router.addRoute(route)
+          }
+        })
+        permissionStore.routesAdded = true
+
+        // 如果有菜单数据，也添加动态路由
+        if (permissionStore.menus.length > 0) {
+          await permissionStore.addDynamicRoutes()
+        }
+
         // 重新导航到目标页面
         next({ ...to, replace: true })
         return

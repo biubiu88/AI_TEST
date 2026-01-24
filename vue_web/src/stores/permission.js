@@ -5,12 +5,19 @@ import router from '@/router'
 // 视图组件映射
 const viewComponents = {
   'Layout': () => import('@/layout/index.vue'),
+  'Home': () => import('@/views/DashboardView.vue'),
   'RequirementView': () => import('@/views/RequirementView.vue'),
   'TestCaseView': () => import('@/views/TestCaseView.vue'),
   'GenerateView': () => import('@/views/GenerateView.vue'),
   'PromptView': () => import('@/views/PromptView.vue'),
   'KnowledgeView': () => import('@/views/KnowledgeView.vue'),
   'LLMConfigView': () => import('@/views/LLMConfigView.vue'),
+  'MCPConfigView': () => import('@/views/MCPConfigView.vue'),
+  'AIAssistantView': () => import('@/views/AIAssistantView.vue'),
+  'MenuView': () => import('@/views/MenuView.vue'),
+  'UserView': () => import('@/views/UserView.vue'),
+  'RoleView': () => import('@/views/RoleView.vue'),
+  'LogView': () => import('@/views/LogView.vue'),
 }
 
 export const usePermissionStore = defineStore('permission', {

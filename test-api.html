@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试AI助手API</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #333;
+            margin-top: 0;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #409eff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background-color: #66b1ff;
+        }
+        pre {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        .error {
+            color: red;
+        }
+        .success {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>AI助手API测试</h1>
+    
+    <div class="section">
+        <h2>1. 登录</h2>
+        <button onclick="login()">登录</button>
+        <pre id="loginResult">点击按钮登录</pre>
+    </div>
+    
+    <div class="section">
+        <h2>2. 获取知识库</h2>
+        <button onclick="getKnowledgeBases()">获取知识库</button>
+        <pre id="knowledgeResult">点击按钮获取知识库</pre>
+    </div>
+    
+    <div class="section">
+        <h2>3. 获取提示词</h2>
+        <button onclick="getPrompts()">获取提示词</button>
+        <pre id="promptsResult">点击按钮获取提示词</pre>
+    </div>
+    
+    <div class="section">
+        <h2>4. 获取大模型</h2>
+        <button onclick="getModels()">获取大模型</button>
+        <pre id="modelsResult">点击按钮获取大模型</pre>
+    </div>
+    
+    <div class="section">
+        <h2>5. 获取MCP配置</h2>
+        <button onclick="getMcpConfigs()">获取MCP配置</button>
+        <pre id="mcpResult">点击按钮获取MCP配置</pre>
+    </div>
+    
+    <div class="section">
+        <h2>6. 获取会话列表</h2>
+        <button onclick="getSessions()">获取会话列表</button>
+        <pre id="sessionsResult">点击按钮获取会话列表</pre>
+    </div>
+
+    <script>
+        let accessToken = '';
+        
+        async function login() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        account: 'admin',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.code === 0) {
+                    accessToken = data.data.accessToken;
+                    document.getElementById('loginResult').innerHTML = '<span class="success">登录成功！</span>\n' + JSON.stringify(data.data, null, 2);
+                    localStorage.setItem('accessToken', accessToken);
+                } else {
+                    document.getElementById('loginResult').innerHTML = '<span class="error">登录失败：' + data.message + '</span>';
+                }
+            } catch (error) {
+                document.getElementById('loginResult').innerHTML = '<span class="error">请求失败：' + error.message + '</span>';
+            }
+        }
+        
+        async function makeRequest(url, elementId) {
+            try {
+                const token = accessToken || localStorage.getItem('accessToken');
+                
+                if (!token) {
+                    document.getElementById(elementId).innerHTML = '<span class="error">请先登录！</span>';
+                    return;
+                }
+                
+                console.log('Making request to:', url);
+                console.log('Token:', token);
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token
+                    }
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (data.code === 0) {
+                    document.getElementById(elementId).innerHTML = '<span class="success">请求成功！</span>\n' + JSON.stringify(data.data, null, 2);
+                } else {
+                    document.getElementById(elementId).innerHTML = '<span class="error">请求失败：' + data.message + '</span>';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById(elementId).innerHTML = '<span class="error">请求失败：' + error.message + '</span>';
+            }
+        }
+        
+        function getKnowledgeBases() {
+            makeRequest('http://localhost:5000/api/ai-assistant/knowledge', 'knowledgeResult');
+        }
+        
+        function getPrompts() {
+            makeRequest('http://localhost:5000/api/ai-assistant/prompts', 'promptsResult');
+        }
+        
+        function getModels() {
+            makeRequest('http://localhost:5000/api/ai-assistant/models', 'modelsResult');
+        }
+        
+        function getMcpConfigs() {
+            makeRequest('http://localhost:5000/api/ai-assistant/mcp-configs', 'mcpResult');
+        }
+        
+        function getSessions() {
+            makeRequest('http://localhost:5000/api/ai-assistant/sessions', 'sessionsResult');
+        }
+    </script>
+</body>
+</html>

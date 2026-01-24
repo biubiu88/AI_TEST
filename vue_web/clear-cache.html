@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>清除缓存</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .info {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            border-left: 4px solid #2196F3;
+        }
+        button {
+            background: #2196F3;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #1976D2;
+        }
+        button.secondary {
+            background: #757575;
+        }
+        button.secondary:hover {
+            background: #616161;
+        }
+        .success {
+            color: #4CAF50;
+            font-weight: bold;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>清除缓存并重新登录</h1>
+        <div class="info">
+            <p><strong>当前localStorage内容：</strong></p>
+            <pre id="localStorage-content"></pre>
+        </div>
+        <button onclick="clearCache()">清除缓存</button>
+        <button class="secondary" onclick="goToLogin()">去登录</button>
+        <div id="message" class="success"></div>
+    </div>
+
+    <script>
+        // 显示当前localStorage内容
+        function showLocalStorage() {
+            const content = {};
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                const value = localStorage.getItem(key);
+                if (key === 'accessToken' || key === 'refreshToken') {
+                    content[key] = value.substring(0, 50) + '...';
+                } else if (key === 'menus') {
+                    try {
+                        const menus = JSON.parse(value);
+                        content[key] = `${menus.length} 个菜单`;
+                    } catch (e) {
+                        content[key] = value;
+                    }
+                } else {
+                    content[key] = value;
+                }
+            }
+            document.getElementById('localStorage-content').textContent = JSON.stringify(content, null, 2);
+        }
+
+        // 清除缓存
+        function clearCache() {
+            localStorage.clear();
+            document.getElementById('message').textContent = '✓ 缓存已清除！现在点击"去登录"按钮重新登录。';
+            showLocalStorage();
+        }
+
+        // 去登录
+        function goToLogin() {
+            window.location.href = '/login';
+        }
+
+        // 页面加载时显示localStorage内容
+        showLocalStorage();
+    </script>
+</body>
+</html>
