@@ -430,6 +430,66 @@ class MCPConfig(db.Model):
         }
 
 
+class ChatSession(db.Model):
+    """AI助手会话模型"""
+    __tablename__ = 'chat_sessions'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, comment='所属用户ID')
+    session_name = db.Column(db.String(100), default='新会话', comment='会话名称')
+    is_pinned = db.Column(db.Boolean, default=False, comment='是否置顶')
+    model_id = db.Column(db.Integer, db.ForeignKey('llm_configs.id'), nullable=True, comment='关联模型配置ID')
+    prompt_id = db.Column(db.Integer, db.ForeignKey('prompts.id'), nullable=True, comment='关联提示词ID')
+    mcp_config_id = db.Column(db.Integer, db.ForeignKey('mcp_configs.id'), nullable=True, comment='关联MCP配置ID')
+    
+    # 存储知识库ID列表（JSON格式）
+    knowledge_ids = db.Column(db.JSON, comment='关联知识库ID列表')
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, comment='更新时间')
+    
+    # 关联消息
+    messages = db.relationship('ChatMessage', backref='session', lazy='dynamic', cascade='all, delete-orphan')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'session_name': self.session_name,
+            'is_pinned': self.is_pinned,
+            'model_id': self.model_id,
+            'prompt_id': self.prompt_id,
+            'mcp_config_id': self.mcp_config_id,
+            'knowledge_ids': self.knowledge_ids or [],
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+
+class ChatMessage(db.Model):
+    """AI助手消息模型"""
+    __tablename__ = 'chat_messages'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    session_id = db.Column(db.Integer, db.ForeignKey('chat_sessions.id'), nullable=False, comment='所属会话ID')
+    role = db.Column(db.String(20), nullable=False, comment='角色: user/assistant/system')
+    content = db.Column(db.Text, nullable=False, comment='消息内容')
+    model = db.Column(db.String(50), comment='使用的模型名称')
+    tokens_used = db.Column(db.Integer, default=0, comment='消耗的token数')
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='发送时间')
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'session_id': self.session_id,
+            'role': self.role,
+            'content': self.content,
+            'model': self.model,
+            'tokens_used': self.tokens_used,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }
+
+
 class OperationLog(db.Model):
     """操作日志模型"""
     __tablename__ = 'operation_logs'

@@ -84,6 +84,8 @@ const loadSessions = async () => {
 
 // 选择会话
 const selectSession = async (session) => {
+  // 确保 session 对象中有必要的默认字段
+  if (!session.knowledge_ids) session.knowledge_ids = []
   currentSession.value = session
   await loadMessages(session.id)
 }
@@ -276,6 +278,38 @@ const toggleFullscreen = () => {
   fullscreen.value = !fullscreen.value
 }
 
+// 删除消息
+const deleteMessage = async (msgId) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这条消息吗？', '提示', { type: 'warning' })
+    await aiAssistantApi.deleteMessage(currentSession.value.id, msgId)
+    const index = messages.value.findIndex(m => m.id === msgId)
+    if (index > -1) {
+      messages.value.splice(index, 1)
+    }
+    ElMessage.success('删除成功')
+  } catch (e) {
+    if (e !== 'cancel') console.error(e)
+  }
+}
+
+// 切换置顶
+const togglePin = async (session) => {
+  try {
+    const newPinned = !session.is_pinned
+    await aiAssistantApi.updateSession(session.id, { is_pinned: newPinned })
+    session.is_pinned = newPinned
+    // 重新排序会话列表
+    sessions.value.sort((a, b) => {
+      if (a.is_pinned !== b.is_pinned) return b.is_pinned ? 1 : -1
+      return new Date(b.updated_at) - new Date(a.updated_at)
+    })
+    ElMessage.success(newPinned ? '已置顶' : '已取消置顶')
+  } catch (error) {
+    console.error('置顶操作失败:', error)
+  }
+}
+
 // 格式化时间
 const formatTime = (time) => {
   const date = new Date(time)
@@ -338,7 +372,8 @@ onMounted(() => {
           @click="selectSession(session)"
         >
           <div class="session-icon">
-            <el-icon><ChatDotRound /></el-icon>
+            <el-icon v-if="session.is_pinned" class="pinned-icon"><Pointer /></el-icon>
+            <el-icon v-else><ChatDotRound /></el-icon>
           </div>
           <div class="session-main">
             <div class="session-name">{{ session.session_name }}</div>
@@ -351,6 +386,9 @@ onMounted(() => {
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
+                  <el-dropdown-item @click="togglePin(session)">
+                    <el-icon><Pointer /></el-icon>{{ session.is_pinned ? '取消置顶' : '置顶' }}
+                  </el-dropdown-item>
                   <el-dropdown-item @click="renameForm.session_name = session.session_name; currentSession = session; renameDialogVisible = true">
                     <el-icon><EditPen /></el-icon>重命名
                   </el-dropdown-item>
@@ -439,9 +477,14 @@ onMounted(() => {
               </div>
               <div class="message-footer">
                 <span class="message-time">{{ formatTime(message.created_at) }}</span>
-                <el-button v-if="message.role === 'assistant'" type="primary" link size="small" class="copy-btn" @click="copyMessage(message.content)">
-                  <el-icon><CopyDocument /></el-icon>复制
-                </el-button>
+                <div class="message-btns">
+                  <el-button v-if="message.role === 'assistant'" type="primary" link size="small" class="copy-btn" @click="copyMessage(message.content)">
+                    <el-icon><CopyDocument /></el-icon>复制
+                  </el-button>
+                  <el-button type="danger" link size="small" class="delete-btn" @click="deleteMessage(message.id)">
+                    <el-icon><Delete /></el-icon>删除
+                  </el-button>
+                </div>
               </div>
             </div>
           </div>
@@ -1085,8 +1128,61 @@ onMounted(() => {
 .message-footer {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
   margin-top: 4px;
+}
+
+.message-btns {
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.message-item:hover .message-btns {
+  opacity: 1;
+}
+
+.delete-btn {
+  padding: 0;
+  height: auto;
+  font-size: 11px;
+}
+
+.pinned-icon {
+  color: var(--el-color-warning);
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+.welcome-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  background-color: #f8fafc;
+}
+
+.welcome-content {
+  text-align: center;
+  max-width: 400px;
+}
+
+.welcome-icon {
+  font-size: 64px;
+  color: #667eea;
+  margin-bottom: 20px;
+}
+
+.welcome-content h2 {
+  margin-bottom: 12px;
+  color: #1e293b;
+}
+
+.welcome-content p {
+  color: #64748b;
+  margin-bottom: 30px;
 }
 
 .message-time {

@@ -5,9 +5,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import User, Prompt, Knowledge, LLMConfig, MCPConfig
+from app.models import User, Prompt, Knowledge, LLMConfig, MCPConfig, ChatSession, ChatMessage
 from app.services.ai_service import AIService
-from app.services.llm_clients import ChatMessage
+from app.services.llm_clients import ChatMessage as LLMChatMessage
 from app.middlewares import log_operation
 
 ai_assistant_bp = Blueprint('ai_assistant', __name__)
@@ -22,125 +22,22 @@ def make_response(code=0, message='success', data=None):
     })
 
 
-# 模拟AI会话数据
-mock_sessions = [
-    {
-        'id': 1,
-        'user_id': 1,
-        'session_name': '测试用例生成讨论',
-        'session_type': 'chat',
-        'model_id': None,
-        'prompt_id': None,
-        'knowledge_ids': None,
-        'mcp_config_id': None,
-        'status': 'active',
-        'created_at': '2024-01-24 17:00:00',
-        'updated_at': '2024-01-24 17:30:00'
-    },
-    {
-        'id': 2,
-        'user_id': 1,
-        'session_name': '需求分析',
-        'session_type': 'analysis',
-        'model_id': None,
-        'prompt_id': None,
-        'knowledge_ids': None,
-        'mcp_config_id': None,
-        'status': 'active',
-        'created_at': '2024-01-24 17:15:00',
-        'updated_at': '2024-01-24 17:20:00'
-    }
-]
-
-# 模拟AI消息数据
-mock_messages = {
-    1: [
-        {
-            'id': 1,
-            'session_id': 1,
-            'role': 'user',
-            'content': '你好，请帮我生成一个用户登录功能的测试用例',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 20,
-            'created_at': '2024-01-24 17:00:10'
-        },
-        {
-            'id': 2,
-            'session_id': 1,
-            'role': 'assistant',
-            'content': '好的，我来帮你生成用户登录功能的测试用例。首先，我需要了解一些信息：\n\n1. 登录方式有哪些？（用户名/邮箱/手机号）\n2. 是否需要验证码？\n3. 是否有密码找回功能？\n4. 是否支持第三方登录？',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 85,
-            'created_at': '2024-01-24 17:00:15'
-        },
-        {
-            'id': 3,
-            'session_id': 1,
-            'role': 'user',
-            'content': '用户名和邮箱都可以登录，需要图形验证码，有密码找回功能，支持微信登录',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 35,
-            'created_at': '2024-01-24 17:10:00'
-        },
-        {
-            'id': 4,
-            'session_id': 1,
-            'role': 'assistant',
-            'content': '好的，基于你提供的信息，我为你生成了以下测试用例：\n\n1. 正常登录测试\n   - 使用正确的用户名和密码登录\n   - 使用正确的邮箱和密码登录\n   - 验证码输入正确\n\n2. 异常登录测试\n   - 用户名不存在\n   - 密码错误\n   - 验证码错误\n   - 用户名或密码为空\n\n3. 密码找回测试\n   - 验证邮箱地址\n   - 发送重置邮件\n   - 重置密码链接有效性\n\n4. 微信登录测试\n   - 微信授权登录\n   - 绑定微信账号\n   - 解绑微信账号',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 180,
-            'created_at': '2024-01-24 17:10:15'
-        }
-    ],
-    2: [
-        {
-            'id': 5,
-            'session_id': 2,
-            'role': 'user',
-            'content': '请帮我分析一下这个需求的测试点',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 15,
-            'created_at': '2024-01-24 17:15:10'
-        },
-        {
-            'id': 6,
-            'session_id': 2,
-            'role': 'assistant',
-            'content': '好的，请提供需求的具体内容，我会帮你分析测试点。',
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': 25,
-            'created_at': '2024-01-24 17:15:15'
-        }
-    ]
-}
-
-
 @ai_assistant_bp.route('/sessions', methods=['GET'])
 @jwt_required()
 @log_operation
 def get_sessions():
     """获取用户的AI会话列表"""
     current_user_id = get_jwt_identity()
-    status = request.args.get('status', '')
     
-    # 将current_user_id转换为整数，因为mock_sessions中的user_id是整数
-    user_id_int = int(current_user_id)
-    
-    # TODO: 从ai_sessions表查询
-    filtered_sessions = [s for s in mock_sessions if s['user_id'] == user_id_int]
-    
-    if status:
-        filtered_sessions = [s for s in filtered_sessions if s['status'] == status]
+    # 按置顶状态和更新时间排序
+    sessions = ChatSession.query.filter_by(user_id=current_user_id).order_by(
+        ChatSession.is_pinned.desc(), 
+        ChatSession.updated_at.desc()
+    ).all()
     
     return make_response(0, 'success', {
-        'list': filtered_sessions,
-        'total': len(filtered_sessions)
+        'list': [s.to_dict() for s in sessions],
+        'total': len(sessions)
     })
 
 
@@ -152,24 +49,19 @@ def create_session():
     current_user_id = get_jwt_identity()
     data = request.get_json()
     
-    new_session = {
-        'id': len(mock_sessions) + 1,
-        'user_id': current_user_id,
-        'session_name': data.get('session_name', '新会话'),
-        'session_type': data.get('session_type', 'chat'),
-        'model_id': data.get('model_id'),
-        'prompt_id': data.get('prompt_id'),
-        'knowledge_ids': data.get('knowledge_ids'),
-        'mcp_config_id': data.get('mcp_config_id'),
-        'status': 'active',
-        'created_at': datetime.utcnow().isoformat(),
-        'updated_at': datetime.utcnow().isoformat()
-    }
+    new_session = ChatSession(
+        user_id=current_user_id,
+        session_name=data.get('session_name', '新会话'),
+        model_id=data.get('model_id'),
+        prompt_id=data.get('prompt_id'),
+        knowledge_ids=data.get('knowledge_ids', []),
+        mcp_config_id=data.get('mcp_config_id')
+    )
     
-    mock_sessions.append(new_session)
-    mock_messages[new_session['id']] = []
+    db.session.add(new_session)
+    db.session.commit()
     
-    return make_response(0, '创建成功', new_session)
+    return make_response(0, '创建成功', new_session.to_dict())
 
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['GET'])
@@ -177,11 +69,12 @@ def create_session():
 @log_operation
 def get_session(session_id):
     """获取会话详情"""
-    # TODO: 从ai_sessions表查询
-    session = next((s for s in mock_sessions if s['id'] == session_id), None)
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
+    
     if not session:
         return make_response(404, '会话不存在')
-    return make_response(0, 'success', session)
+    return make_response(0, 'success', session.to_dict())
 
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['PUT'])
@@ -189,29 +82,31 @@ def get_session(session_id):
 @log_operation
 def update_session(session_id):
     """更新会话"""
-    # TODO: 从ai_sessions表查询
-    session = next((s for s in mock_sessions if s['id'] == session_id), None)
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
+    
     if not session:
         return make_response(404, '会话不存在')
     
     data = request.get_json()
     
     if 'session_name' in data:
-        session['session_name'] = data['session_name']
+        session.session_name = data['session_name']
+    if 'is_pinned' in data:
+        session.is_pinned = data['is_pinned']
     if 'model_id' in data:
-        session['model_id'] = data['model_id']
+        session.model_id = data['model_id']
     if 'prompt_id' in data:
-        session['prompt_id'] = data['prompt_id']
+        session.prompt_id = data['prompt_id']
     if 'knowledge_ids' in data:
-        session['knowledge_ids'] = data['knowledge_ids']
+        session.knowledge_ids = data['knowledge_ids']
     if 'mcp_config_id' in data:
-        session['mcp_config_id'] = data['mcp_config_id']
-    if 'status' in data:
-        session['status'] = data['status']
+        session.mcp_config_id = data['mcp_config_id']
     
-    session['updated_at'] = datetime.utcnow().isoformat()
+    session.updated_at = datetime.utcnow()
+    db.session.commit()
     
-    return make_response(0, '更新成功', session)
+    return make_response(0, '更新成功', session.to_dict())
 
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['DELETE'])
@@ -219,11 +114,14 @@ def update_session(session_id):
 @log_operation
 def delete_session(session_id):
     """删除会话"""
-    # TODO: 从ai_sessions表删除
-    global mock_sessions
-    mock_sessions = [s for s in mock_sessions if s['id'] != session_id]
-    if session_id in mock_messages:
-        del mock_messages[session_id]
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
+    
+    if not session:
+        return make_response(404, '会话不存在')
+    
+    db.session.delete(session)
+    db.session.commit()
     
     return make_response(0, '删除成功')
 
@@ -233,174 +131,140 @@ def delete_session(session_id):
 @log_operation
 def get_messages(session_id):
     """获取会话的消息列表"""
-    # TODO: 从ai_messages表查询
-    messages = mock_messages.get(session_id, [])
-    return make_response(0, 'success', messages)
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
+    
+    if not session:
+        return make_response(404, '会话不存在')
+    
+    messages = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.asc()).all()
+    return make_response(0, 'success', [m.to_dict() for m in messages])
 
 
 @ai_assistant_bp.route('/sessions/<int:session_id>/messages', methods=['POST'])
 @jwt_required()
 @log_operation
 def send_message(session_id):
-    """发送消息"""
-    data = request.get_json()
-    content = data.get('content', '').strip()
+    """发送消息并获取AI回复"""
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
     
-    if not content:
-        return make_response(400, '消息内容不能为空')
-    
-    # 获取会话信息
-    session = next((s for s in mock_sessions if s['id'] == session_id), None)
     if not session:
         return make_response(404, '会话不存在')
     
-    # 保存用户消息
-    user_message = {
-        'id': len(mock_messages.get(session_id, [])) + 1,
-        'session_id': session_id,
-        'role': 'user',
-        'content': content,
-        'message_type': data.get('message_type', 'text'),
-        'metadata': data.get('metadata'),
-        'token_count': len(content.split()),
-        'created_at': datetime.utcnow().isoformat()
-    }
+    data = request.get_json()
+    user_content = data.get('content', '').strip()
     
-    if session_id not in mock_messages:
-        mock_messages[session_id] = []
-    mock_messages[session_id].append(user_message)
+    if not user_content:
+        return make_response(400, '消息内容不能为空')
     
-    # 调用AI服务生成回复
+    # 1. 保存用户消息
+    user_msg = ChatMessage(
+        session_id=session_id,
+        role='user',
+        content=user_content
+    )
+    db.session.add(user_msg)
+    
+    # 先提交一次，确保用户消息已保存
     try:
-        # 获取大模型配置
-        model_id = data.get('options', {}).get('model_id') or session.get('model_id')
-        prompt_id = data.get('options', {}).get('prompt_id') or session.get('prompt_id')
-        knowledge_ids = data.get('options', {}).get('knowledge_ids') or session.get('knowledge_ids', [])
+        session.updated_at = datetime.utcnow()
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return make_response(500, f'保存消息失败: {str(e)}')
+    
+    # 2. 调用AI服务
+    try:
+        # 准备配置
+        options = data.get('options', {})
+        model_id = options.get('model_id') or session.model_id
+        prompt_id = options.get('prompt_id') or session.prompt_id
+        knowledge_ids = options.get('knowledge_ids') or session.knowledge_ids or []
         
-        # 获取提示词内容
-        prompt_content = None
+        # 获取系统提示词
+        system_prompt = ""
         if prompt_id:
-            prompt = Prompt.query.filter(
-                Prompt.id == prompt_id,
-                Prompt.is_active == True
-            ).first()
+            prompt = Prompt.query.get(prompt_id)
             if prompt:
-                prompt_content = prompt.content
+                system_prompt = prompt.content
         
-        # 获取知识库内容
-        knowledge_contents = None
+        # 获取知识库上下文
         if knowledge_ids:
-            knowledges = Knowledge.query.filter(
-                Knowledge.id.in_(knowledge_ids),
-                Knowledge.is_active == True
-            ).all()
+            knowledges = Knowledge.query.filter(Knowledge.id.in_(knowledge_ids)).all()
             if knowledges:
-                knowledge_contents = [k.content for k in knowledges]
+                knowledge_context = "\n\n参考知识库内容：\n" + "\n\n".join([k.content for k in knowledges])
+                system_prompt += knowledge_context
         
-        # 创建AI服务
+        # 构建历史记录
+        history = ChatMessage.query.filter_by(session_id=session_id).order_by(ChatMessage.created_at.asc()).all()
+        llm_messages = []
+        
+        if system_prompt:
+            llm_messages.append(LLMChatMessage(role="system", content=system_prompt))
+            
+        for m in history[-11:]:  # 取最近10条+当前这条
+            llm_messages.append(LLMChatMessage(role=m.role, content=m.content))
+            
+        # 初始化AI服务
         ai_service = None
         if model_id:
-            llm_config = LLMConfig.query.get(model_id)
-            if llm_config and llm_config.is_active:
-                ai_service = AIService(llm_config)
-        else:
+            config = LLMConfig.query.get(model_id)
+            if config:
+                ai_service = AIService(config)
+        
+        if not ai_service:
             ai_service = AIService.get_default_service()
-        
-        # 构建消息历史
-        messages = []
-        # 添加系统提示词
-        if prompt_content:
-            messages.append(ChatMessage(role="system", content=prompt_content))
-        
-        # 添加知识库上下文
-        if knowledge_contents:
-            knowledge_context = "\n\n参考知识库内容：\n" + "\n\n".join(knowledge_contents[:1000])  # 限制知识库内容长度
-            messages.append(ChatMessage(role="system", content=knowledge_context))
-        
-        # 添加历史消息
-        history_messages = mock_messages.get(session_id, [])
-        for msg in history_messages[-10:]:  # 只取最近10条消息
-            messages.append(ChatMessage(role=msg['role'], content=msg['content']))
-        
-        # 添加当前用户消息
-        messages.append(ChatMessage(role="user", content=content))
-        
-        # 调用AI服务
+            
+        # 发送请求
+        ai_response_content = ""
         if ai_service:
-            response = ai_service.client.chat(
-                messages=messages,
-                temperature=0.7,
-                max_tokens=2000
-            )
-            ai_response = response.content
+            try:
+                response = ai_service.client.chat(messages=llm_messages)
+                ai_response_content = response.content
+            except Exception as e:
+                ai_response_content = f"AI助手调用出错: {str(e)}"
         else:
-            # 没有配置AI服务，使用模拟回复
-            ai_response = generate_ai_response(content, {})
+            ai_response_content = "未配置AI服务，请在设置中选择模型。"
+            
+        # 3. 保存AI回复
+        assistant_msg = ChatMessage(
+            session_id=session_id,
+            role='assistant',
+            content=ai_response_content,
+            model=ai_service.model if ai_service else 'unknown'
+        )
+        db.session.add(assistant_msg)
         
-        # 保存AI回复
-        assistant_message = {
-            'id': user_message['id'] + 1,
-            'session_id': session_id,
-            'role': 'assistant',
-            'content': ai_response,
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': len(ai_response.split()),
-            'created_at': datetime.utcnow().isoformat()
-        }
+        # 更新会话时间
+        session.updated_at = datetime.utcnow()
+        db.session.commit()
         
-        mock_messages[session_id].append(assistant_message)
+        return make_response(0, '发送成功', assistant_msg.to_dict())
         
-        return make_response(0, '发送成功', assistant_message)
-    
     except Exception as e:
         import traceback
         traceback.print_exc()
-        # 如果AI调用失败，使用模拟回复
-        ai_response = generate_ai_response(content, {})
-        
-        assistant_message = {
-            'id': user_message['id'] + 1,
-            'session_id': session_id,
-            'role': 'assistant',
-            'content': ai_response,
-            'message_type': 'text',
-            'metadata': None,
-            'token_count': len(ai_response.split()),
-            'created_at': datetime.utcnow().isoformat()
-        }
-        
-        if session_id not in mock_messages:
-            mock_messages[session_id] = []
-        mock_messages[session_id].append(assistant_message)
-        
-        return make_response(0, '发送成功', assistant_message)
-
-
-def generate_ai_response(user_message, options):
-    """生成AI回复（模拟）"""
-    # 这里应该调用真实的AI模型
-    responses = [
-        "我理解你的问题。让我来帮你分析一下...",
-        "这是一个很好的问题！根据你提供的信息，我的建议是...",
-        "基于你的描述，我认为需要考虑以下几个方面...",
-        "我来帮你解决这个问题。首先，我们需要明确..."
-    ]
-    
-    import random
-    return random.choice(responses)
+        return make_response(500, f'处理AI回复失败: {str(e)}')
 
 
 @ai_assistant_bp.route('/sessions/<int:session_id>/messages/<int:message_id>', methods=['DELETE'])
 @jwt_required()
 @log_operation
 def delete_message(session_id, message_id):
-    """删除消息"""
-    # TODO: 从ai_messages表删除
-    if session_id in mock_messages:
-        mock_messages[session_id] = [
-            m for m in mock_messages[session_id] if m['id'] != message_id
-        ]
+    """删除单条消息"""
+    current_user_id = get_jwt_identity()
+    session = ChatSession.query.filter_by(id=session_id, user_id=current_user_id).first()
+    
+    if not session:
+        return make_response(404, '会话不存在')
+    
+    msg = ChatMessage.query.filter_by(id=message_id, session_id=session_id).first()
+    if not msg:
+        return make_response(404, '消息不存在')
+        
+    db.session.delete(msg)
+    db.session.commit()
     
     return make_response(0, '删除成功')
 
@@ -410,20 +274,10 @@ def delete_message(session_id, message_id):
 @log_operation
 def get_knowledge_bases():
     """获取知识库列表"""
-    # 从知识库表查询
-    knowledges = Knowledge.query.filter(
-        Knowledge.is_active == True
-    ).order_by(Knowledge.created_at.desc()).all()
-    
-    result = []
-    for kb in knowledges:
-        result.append({
-            'id': kb.id,
-            'name': kb.name,
-            'description': kb.description or ''
-        })
-    
-    return make_response(0, 'success', result)
+    knowledges = Knowledge.query.filter_by(is_active=True).all()
+    return make_response(0, 'success', [
+        {'id': k.id, 'name': k.name, 'description': k.description} for k in knowledges
+    ])
 
 
 @ai_assistant_bp.route('/prompts', methods=['GET'])
@@ -431,20 +285,10 @@ def get_knowledge_bases():
 @log_operation
 def get_prompts():
     """获取提示词列表"""
-    # 从提示词表查询
-    prompts = Prompt.query.filter(
-        Prompt.is_active == True
-    ).order_by(Prompt.created_at.desc()).all()
-    
-    result = []
-    for prompt in prompts:
-        result.append({
-            'id': prompt.id,
-            'name': prompt.name,
-            'description': prompt.description or ''
-        })
-    
-    return make_response(0, 'success', result)
+    prompts = Prompt.query.filter_by(is_active=True).all()
+    return make_response(0, 'success', [
+        {'id': p.id, 'name': p.name, 'description': p.description} for p in prompts
+    ])
 
 
 @ai_assistant_bp.route('/models', methods=['GET'])
@@ -452,22 +296,10 @@ def get_prompts():
 @log_operation
 def get_models():
     """获取大模型列表"""
-    # 从大模型配置表查询
-    models = LLMConfig.query.filter(
-        LLMConfig.is_active == True
-    ).order_by(LLMConfig.created_at.desc()).all()
-    
-    result = []
-    for model in models:
-        result.append({
-            'id': model.id,
-            'name': model.name,
-            'provider': model.provider,
-            'model': model.model,
-            'description': model.description or ''
-        })
-    
-    return make_response(0, 'success', result)
+    models = LLMConfig.query.filter_by(is_active=True).all()
+    return make_response(0, 'success', [
+        {'id': m.id, 'name': m.name, 'provider': m.provider, 'model': m.model} for m in models
+    ])
 
 
 @ai_assistant_bp.route('/mcp-configs', methods=['GET'])
@@ -475,19 +307,7 @@ def get_models():
 @log_operation
 def get_mcp_configs():
     """获取MCP配置列表"""
-    # 从MCP配置表查询
-    mcp_configs = MCPConfig.query.filter(
-        MCPConfig.status == 1
-    ).order_by(MCPConfig.created_at.desc()).all()
-    
-    result = []
-    for mcp in mcp_configs:
-        result.append({
-            'id': mcp.id,
-            'name': mcp.name,
-            'server_name': mcp.server_name,
-            'server_url': mcp.server_url
-        })
-    
-    return make_response(0, 'success', result)
-
+    mcp_configs = MCPConfig.query.filter_by(status=1).all()
+    return make_response(0, 'success', [
+        {'id': m.id, 'name': m.name, 'server_name': m.server_name} for m in mcp_configs
+    ])
