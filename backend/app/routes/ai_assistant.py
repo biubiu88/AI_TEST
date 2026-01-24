@@ -127,8 +127,11 @@ def get_sessions():
     current_user_id = get_jwt_identity()
     status = request.args.get('status', '')
     
+    # 将current_user_id转换为整数，因为mock_sessions中的user_id是整数
+    user_id_int = int(current_user_id)
+    
     # TODO: 从ai_sessions表查询
-    filtered_sessions = [s for s in mock_sessions if s['user_id'] == current_user_id]
+    filtered_sessions = [s for s in mock_sessions if s['user_id'] == user_id_int]
     
     if status:
         filtered_sessions = [s for s in filtered_sessions if s['status'] == status]

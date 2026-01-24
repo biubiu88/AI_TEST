@@ -106,10 +106,10 @@ def login():
     
     # 创建JWT令牌
     access_token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={'username': user.username, 'roles': role_codes}
     )
-    refresh_token = create_refresh_token(identity=user.id)
+    refresh_token = create_refresh_token(identity=str(user.id))
     
     # 获取用户菜单
     if 'admin' in role_codes:
@@ -146,7 +146,7 @@ def refresh():
     
     role_codes = user.get_role_codes()
     access_token = create_access_token(
-        identity=user.id,
+        identity=str(user.id),
         additional_claims={'username': user.username, 'roles': role_codes}
     )
     

@@ -2,6 +2,31 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { aiAssistantApi } from '@/api'
+import MarkdownIt from 'markdown-it'
+import hljs from 'highlight.js'
+import 'highlight.js/styles/github.css'
+
+// 初始化 Markdown 解析器
+const md = new MarkdownIt({
+  html: true,
+  linkify: true,
+  typographer: true,
+  highlight: function (str, lang) {
+    if (lang && hljs.getLanguage(lang)) {
+      try {
+        return '<pre class="hljs"><code>' +
+               hljs.highlight(str, { language: lang, ignoreIllegals: true }).value +
+               '</code></pre>';
+      } catch (__) {}
+    }
+    return '<pre class="hljs"><code>' + md.utils.escapeHtml(str) + '</code></pre>';
+  }
+})
+
+// 渲染 Markdown 内容
+const renderMarkdown = (content) => {
+  return md.render(content || '')
+}
 
 // 会话列表
 const sessions = ref([])
@@ -275,6 +300,16 @@ const getModelName = (modelId) => {
   return model ? model.name : '未知模型'
 }
 
+// 复制消息
+const copyMessage = (content) => {
+  navigator.clipboard.writeText(content).then(() => {
+    ElMessage.success('已复制到剪贴板')
+  }).catch(err => {
+    console.error('复制失败:', err)
+    ElMessage.error('复制失败')
+  })
+}
+
 onMounted(() => {
   loadSessions()
 })
@@ -285,8 +320,11 @@ onMounted(() => {
     <!-- 会话列表侧边栏 -->
     <div class="session-sidebar">
       <div class="sidebar-header">
-        <h3>AI助手</h3>
-        <el-button type="primary" size="small" @click="createSession">
+        <div class="header-top">
+          <el-icon class="app-icon"><ChatLineRound /></el-icon>
+          <h3>AI 助手</h3>
+        </div>
+        <el-button class="new-session-btn" type="primary" @click="createSession">
           <el-icon><Plus /></el-icon>
           新建会话
         </el-button>
@@ -299,22 +337,25 @@ onMounted(() => {
           :class="['session-item', { active: currentSession?.id === session.id }]"
           @click="selectSession(session)"
         >
+          <div class="session-icon">
+            <el-icon><ChatDotRound /></el-icon>
+          </div>
           <div class="session-main">
             <div class="session-name">{{ session.session_name }}</div>
             <div class="session-time">{{ formatTime(session.updated_at) }}</div>
           </div>
           <div class="session-actions" @click.stop>
-            <el-dropdown trigger="click">
-              <el-button type="primary" link size="small">
+            <el-dropdown trigger="click" placement="bottom-end">
+              <el-button type="primary" link size="small" class="more-btn">
                 <el-icon><MoreFilled /></el-icon>
               </el-button>
               <template #dropdown>
                 <el-dropdown-menu>
                   <el-dropdown-item @click="renameForm.session_name = session.session_name; currentSession = session; renameDialogVisible = true">
-                    重命名
+                    <el-icon><EditPen /></el-icon>重命名
                   </el-dropdown-item>
                   <el-dropdown-item @click="deleteSession(session)" style="color: #f56c6c">
-                    删除
+                    <el-icon><Delete /></el-icon>删除
                   </el-dropdown-item>
                 </el-dropdown-menu>
               </template>
@@ -365,11 +406,22 @@ onMounted(() => {
         <!-- 消息列表 -->
         <div class="messages-container" ref="messagesContainer">
           <div v-if="messages.length === 0" class="empty-state">
-            <div class="empty-icon">
-              <el-icon><ChatLineRound /></el-icon>
+            <div class="empty-illustration">
+              <div class="ai-circle">
+                <el-icon><Cpu /></el-icon>
+              </div>
+              <div class="pulse-ring"></div>
             </div>
-            <h3>开始与AI助手对话吧！</h3>
-            <p>你可以询问测试相关的问题，让我帮你生成测试用例、分析需求等</p>
+            <h3>开始与 AI 助手对话吧！</h3>
+            <p>我可以帮你生成测试用例、分析需求、编写脚本或解答任何测试相关的技术难题</p>
+            <div class="quick-suggestions">
+              <div class="suggestion-tag" @click="messageContent = '帮我生成一个登录页面的测试用例'; sendMessage()">
+                生成登录测试用例
+              </div>
+              <div class="suggestion-tag" @click="messageContent = '如何进行性能测试压力测试？'; sendMessage()">
+                性能测试建议
+              </div>
+            </div>
           </div>
           
           <div
@@ -378,24 +430,33 @@ onMounted(() => {
             :class="['message-item', message.role]"
           >
             <div class="message-avatar">
-              <el-icon v-if="message.role === 'user'"><User /></el-icon>
-              <el-icon v-else><Robot /></el-icon>
+              <el-avatar :size="40" :icon="message.role === 'user' ? 'User' : 'Service'" 
+                :class="message.role === 'user' ? 'user-avatar' : 'ai-avatar'" />
             </div>
             <div class="message-content">
-              <div class="message-text">{{ message.content }}</div>
-              <div class="message-time">{{ formatTime(message.created_at) }}</div>
+              <div class="message-bubble">
+                <div class="message-text markdown-body" v-html="renderMarkdown(message.content)"></div>
+              </div>
+              <div class="message-footer">
+                <span class="message-time">{{ formatTime(message.created_at) }}</span>
+                <el-button v-if="message.role === 'assistant'" type="primary" link size="small" class="copy-btn" @click="copyMessage(message.content)">
+                  <el-icon><CopyDocument /></el-icon>复制
+                </el-button>
+              </div>
             </div>
           </div>
           
           <div v-if="sending" class="message-item assistant">
             <div class="message-avatar">
-              <el-icon><Robot /></el-icon>
+              <el-avatar :size="40" icon="Service" class="ai-avatar" />
             </div>
             <div class="message-content">
-              <div class="message-text typing">
-                <span></span>
-                <span></span>
-                <span></span>
+              <div class="message-bubble">
+                <div class="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
               </div>
             </div>
           </div>
@@ -449,7 +510,6 @@ onMounted(() => {
       width="600px"
       destroy-on-close
       append-to-body
-      :z-index="10000"
     >
       <el-form label-width="100px">
         <el-form-item label="会话名称">
@@ -548,7 +608,6 @@ onMounted(() => {
       width="400px"
       destroy-on-close
       append-to-body
-      :z-index="10000"
     >
       <el-form label-width="80px">
         <el-form-item label="会话名称">
@@ -566,10 +625,12 @@ onMounted(() => {
 <style scoped>
 .ai-assistant-view {
   display: flex;
-  height: calc(100vh - 80px);
-  gap: 16px;
-  padding: 16px;
-  background: #f5f7fa;
+  height: 100%;
+  gap: 20px;
+  padding: 0;
+  background-color: #f0f2f5;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  overflow: hidden;
 }
 
 .ai-assistant-view.fullscreen {
@@ -578,111 +639,166 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9999;
+  z-index: 1000;
   height: 100vh;
   padding: 0;
   gap: 0;
   background: #fff;
 }
 
+/* 侧边栏优化 */
 .session-sidebar {
-  width: 280px;
+  width: 300px;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef0f2;
 }
 
 .fullscreen .session-sidebar {
   border-radius: 0;
   box-shadow: none;
+  border: none;
+  border-right: 1px solid #f0f0f0;
 }
 
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid #e8ecf1;
+  padding: 24px 20px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
 }
 
-.sidebar-header h3 {
-  margin: 0 0 12px 0;
-  font-size: 18px;
-  font-weight: 600;
+.header-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
+.app-icon {
+  font-size: 24px;
+}
+
+.sidebar-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.new-session-btn {
+  width: 100%;
+  height: 40px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
+  font-weight: 600;
+  transition: all 0.3s;
+}
+
+.new-session-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: translateY(-1px);
 }
 
 .session-list {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px 12px;
 }
 
 .session-item {
-  padding: 14px;
-  border-radius: 8px;
+  padding: 12px 16px;
+  border-radius: 12px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   margin-bottom: 8px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   border: 1px solid transparent;
 }
 
+.session-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #f5f7fa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #764ba2;
+  font-size: 18px;
+}
+
 .session-item:hover {
-  background: #f8f9fa;
-  border-color: #e8ecf1;
+  background: #f8faff;
+  border-color: #e0e7ff;
 }
 
 .session-item.active {
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
+  background: #f0f4ff;
   border-color: #667eea;
+}
+
+.session-item.active .session-icon {
+  background: #667eea;
+  color: #fff;
 }
 
 .session-main {
   flex: 1;
+  min-width: 0;
 }
 
 .session-name {
-  font-weight: 500;
-  margin-bottom: 4px;
-  color: #333;
+  font-weight: 600;
+  font-size: 14px;
+  color: #2c3e50;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .session-time {
   font-size: 12px;
-  color: #999;
+  color: #94a3b8;
 }
 
 .session-actions {
   opacity: 0;
-  transition: opacity 0.3s;
+  transition: opacity 0.2s;
 }
 
 .session-item:hover .session-actions {
   opacity: 1;
 }
 
+.more-btn {
+  padding: 4px;
+}
+
+/* 聊天区域优化 */
 .chat-area {
   flex: 1;
   background: #fff;
-  border-radius: 12px;
+  border-radius: 16px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eef0f2;
 }
 
 .fullscreen .chat-area {
   border-radius: 0;
   box-shadow: none;
+  border: none;
 }
 
 .chat-container {
@@ -692,174 +808,331 @@ onMounted(() => {
 }
 
 .chat-header {
+  flex-shrink: 0;
   padding: 16px 24px;
-  border-bottom: 1px solid #e8ecf1;
-  background: #fff;
-}
-
-.chat-title {
+  border-bottom: 1px solid #f0f0f0;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
 }
 
 .chat-title h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: #333;
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 .chat-badges {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.chat-badges .el-tag {
+.header-actions {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  gap: 12px;
 }
 
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 24px;
-  background: #f8f9fa;
+  min-height: 0;
+  padding: 30px 24px;
+  background: #fcfdfe;
+  scroll-behavior: smooth;
 }
 
-.message-item {
+/* 空状态美化 */
+.empty-state {
   display: flex;
-  gap: 12px;
-  margin-bottom: 24px;
-  animation: fadeIn 0.3s ease-in;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px;
+  text-align: center;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.empty-illustration {
+  position: relative;
+  margin-bottom: 30px;
 }
 
-.message-item.user {
-  flex-direction: row-reverse;
-}
-
-.message-avatar {
-  width: 40px;
-  height: 40px;
+.ai-circle {
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-shrink: 0;
-  font-size: 20px;
-}
-
-.message-item.assistant .message-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
+  font-size: 40px;
+  z-index: 2;
+  position: relative;
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
 }
 
-.message-item.user .message-avatar {
+.pulse-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  border: 2px solid #667eea;
+  border-radius: 50%;
+  opacity: 0;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+.empty-state h3 {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.empty-state p {
+  color: #64748b;
+  max-width: 450px;
+  line-height: 1.6;
+  margin-bottom: 30px;
+}
+
+.quick-suggestions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.suggestion-tag {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.suggestion-tag:hover {
+  border-color: #667eea;
+  color: #667eea;
+  background: #f8faff;
+  transform: translateY(-1px);
+}
+
+/* 消息气泡优化 */
+.message-item {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+  max-width: 85%;
+}
+
+.message-item.user {
+  margin-left: auto;
+  flex-direction: row-reverse;
+}
+
+.user-avatar {
   background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   color: #fff;
 }
 
-.message-content {
-  max-width: 70%;
-}
-
-.message-text {
-  background: #fff;
-  padding: 16px 20px;
-  border-radius: 12px;
-  line-height: 1.6;
-  color: #333;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
-  white-space: pre-wrap;
-  word-wrap: break-word;
-}
-
-.message-item.user .message-text {
+.ai-avatar {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   color: #fff;
 }
 
-.message-time {
-  font-size: 12px;
-  color: #999;
-  margin-top: 8px;
-  text-align: right;
-}
-
-.message-item.assistant .message-time {
-  text-align: left;
-}
-
-.typing {
+.message-content {
   display: flex;
-  gap: 4px;
-  padding: 16px 20px;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.typing span {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #999;
-  animation: typing 1.4s infinite ease-in-out both;
+.message-bubble {
+  padding: 14px 18px;
+  border-radius: 18px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  position: relative;
+  line-height: 1.6;
+  font-size: 14.5px;
 }
 
-.typing span:nth-child(1) {
-  animation-delay: -0.32s;
-}
-
-.typing span:nth-child(2) {
-  animation-delay: -0.16s;
-}
-
-@keyframes typing {
-  0%, 80%, 100% {
-    transform: scale(0);
-  }
-  40% {
-    transform: scale(1);
-  }
-}
-
-.input-area {
-  padding: 16px 24px;
-  border-top: 1px solid #e8ecf1;
+.message-item.assistant .message-bubble {
   background: #fff;
+  color: #1e293b;
+  border: 1px solid #f1f5f9;
+  border-top-left-radius: 4px;
+}
+
+.message-item.user .message-bubble {
+  background: #667eea;
+  color: #fff;
+  border-top-right-radius: 4px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
+
+.message-text {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* Markdown 样式优化 */
+:deep(.markdown-body) {
+  font-size: 14.5px;
+  line-height: 1.6;
+  
+  p {
+    margin-bottom: 8px;
+    &:last-child { margin-bottom: 0; }
+  }
+  
+  ul, ol {
+    padding-left: 20px;
+    margin-bottom: 8px;
+  }
+  
+  li { margin-bottom: 4px; }
+  
+  code {
+    background-color: rgba(175, 184, 193, 0.2);
+    padding: 0.2em 0.4em;
+    border-radius: 6px;
+    font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+    font-size: 85%;
+  }
+  
+  pre {
+    background-color: #f6f8fa;
+    padding: 16px;
+    border-radius: 8px;
+    overflow: auto;
+    margin-bottom: 12px;
+    
+    code {
+      background-color: transparent;
+      padding: 0;
+      font-size: 13px;
+    }
+  }
+  
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+    overflow-x: auto;
+    display: block;
+    
+    th, td {
+      border: 1px solid #d0d7de;
+      padding: 6px 13px;
+    }
+    
+    th {
+      font-weight: 600;
+      background-color: #f6f8fa;
+    }
+    
+    tr:nth-child(2n) {
+      background-color: #f6f8fa;
+    }
+  }
+  
+  blockquote {
+    border-left: 4px solid #d0d7de;
+    padding: 0 1em;
+    color: #656d76;
+    margin: 0 0 8px 0;
+  }
+}
+
+.message-item.user :deep(.markdown-body) {
+  color: #fff;
+  
+  code {
+    background-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+  }
+  
+  pre {
+    background-color: rgba(0, 0, 0, 0.2);
+    code { color: #fff; }
+  }
+  
+  table {
+    th, td { border-color: rgba(255, 255, 255, 0.3); }
+    tr:nth-child(2n) { background-color: rgba(255, 255, 255, 0.1); }
+  }
+  
+  blockquote {
+    border-left-color: rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+  }
+}
+
+.message-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.message-time {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.message-item.user .message-footer {
+  justify-content: flex-end;
+}
+
+.copy-btn {
+  padding: 0;
+  height: auto;
+  font-size: 11px;
+}
+
+/* 输入区域优化 */
+.input-area {
+  flex-shrink: 0;
+  padding: 20px 24px;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
 }
 
 .input-wrapper {
-  background: #f8f9fa;
-  border-radius: 12px;
-  padding: 12px;
-  border: 1px solid #e8ecf1;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 8px;
   transition: all 0.3s;
 }
 
 .input-wrapper:focus-within {
   border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.08);
 }
 
 .input-wrapper :deep(.el-textarea__inner) {
   border: none;
   background: transparent;
-  resize: none;
-  font-size: 14px;
-  line-height: 1.6;
+  padding: 8px 12px;
+  font-size: 15px;
+  color: #1e293b;
+  box-shadow: none !important;
 }
 
 .input-wrapper :deep(.el-textarea__inner):focus {
@@ -867,89 +1140,63 @@ onMounted(() => {
 }
 
 .input-actions {
-  margin-top: 12px;
   display: flex;
   justify-content: flex-end;
+  padding: 4px 8px;
+}
+
+.input-actions .el-button {
+  border-radius: 10px;
+  padding: 10px 24px;
 }
 
 .input-hint {
   margin-top: 12px;
-  padding: 8px 12px;
-  background: #f0f9ff;
-  border-radius: 6px;
-  color: #667eea;
+  color: #94a3b8;
   font-size: 12px;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  gap: 6px;
   justify-content: center;
-  height: 100%;
-  color: #999;
-  padding: 40px;
 }
 
-.empty-icon {
-  width: 120px;
-  height: 120px;
+/* 输入状态动画 */
+.typing-indicator {
+  display: flex;
+  gap: 5px;
+  padding: 10px 5px;
+}
+
+.typing-indicator span {
+  width: 6px;
+  height: 6px;
+  background: #667eea;
   border-radius: 50%;
-  background: linear-gradient(135deg, #667eea15 0%, #764ba215 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 24px;
+  animation: bounce 1.4s infinite ease-in-out both;
 }
 
-.empty-icon .el-icon {
-  font-size: 64px;
-  color: #667eea;
+.typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+.typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
 }
 
-.empty-state h2 {
-  margin: 0 0 12px 0;
-  font-size: 24px;
-  font-weight: 600;
-  color: #333;
-}
-
-.empty-state h3 {
-  margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-}
-
-.empty-state p {
-  margin: 0 0 24px 0;
-  color: #666;
-  text-align: center;
-  max-width: 400px;
-}
-
-/* 滚动条样式 */
+/* 滚动条 */
 .session-list::-webkit-scrollbar,
 .messages-container::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .session-list::-webkit-scrollbar-thumb,
 .messages-container::-webkit-scrollbar-thumb {
-  background: #d8dce5;
-  border-radius: 3px;
+  background: #e2e8f0;
+  border-radius: 10px;
 }
 
 .session-list::-webkit-scrollbar-thumb:hover,
 .messages-container::-webkit-scrollbar-thumb:hover {
-  background: #c0c4cc;
-}
-
-.session-list::-webkit-scrollbar-track,
-.messages-container::-webkit-scrollbar-track {
-  background: transparent;
+  background: #cbd5e1;
 }
 </style>
