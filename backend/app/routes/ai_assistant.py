@@ -8,6 +8,7 @@ from app import db
 from app.models import User, Prompt, Knowledge, LLMConfig, MCPConfig
 from app.services.ai_service import AIService
 from app.services.llm_clients import ChatMessage
+from app.middlewares import log_operation
 
 ai_assistant_bp = Blueprint('ai_assistant', __name__)
 
@@ -122,6 +123,7 @@ mock_messages = {
 
 @ai_assistant_bp.route('/sessions', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_sessions():
     """获取用户的AI会话列表"""
     current_user_id = get_jwt_identity()
@@ -144,6 +146,7 @@ def get_sessions():
 
 @ai_assistant_bp.route('/sessions', methods=['POST'])
 @jwt_required()
+@log_operation
 def create_session():
     """创建新会话"""
     current_user_id = get_jwt_identity()
@@ -171,6 +174,7 @@ def create_session():
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_session(session_id):
     """获取会话详情"""
     # TODO: 从ai_sessions表查询
@@ -182,6 +186,7 @@ def get_session(session_id):
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['PUT'])
 @jwt_required()
+@log_operation
 def update_session(session_id):
     """更新会话"""
     # TODO: 从ai_sessions表查询
@@ -211,6 +216,7 @@ def update_session(session_id):
 
 @ai_assistant_bp.route('/sessions/<int:session_id>', methods=['DELETE'])
 @jwt_required()
+@log_operation
 def delete_session(session_id):
     """删除会话"""
     # TODO: 从ai_sessions表删除
@@ -224,6 +230,7 @@ def delete_session(session_id):
 
 @ai_assistant_bp.route('/sessions/<int:session_id>/messages', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_messages(session_id):
     """获取会话的消息列表"""
     # TODO: 从ai_messages表查询
@@ -233,6 +240,7 @@ def get_messages(session_id):
 
 @ai_assistant_bp.route('/sessions/<int:session_id>/messages', methods=['POST'])
 @jwt_required()
+@log_operation
 def send_message(session_id):
     """发送消息"""
     data = request.get_json()
@@ -385,6 +393,7 @@ def generate_ai_response(user_message, options):
 
 @ai_assistant_bp.route('/sessions/<int:session_id>/messages/<int:message_id>', methods=['DELETE'])
 @jwt_required()
+@log_operation
 def delete_message(session_id, message_id):
     """删除消息"""
     # TODO: 从ai_messages表删除
@@ -398,6 +407,7 @@ def delete_message(session_id, message_id):
 
 @ai_assistant_bp.route('/knowledge', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_knowledge_bases():
     """获取知识库列表"""
     # 从知识库表查询
@@ -418,6 +428,7 @@ def get_knowledge_bases():
 
 @ai_assistant_bp.route('/prompts', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_prompts():
     """获取提示词列表"""
     # 从提示词表查询
@@ -438,6 +449,7 @@ def get_prompts():
 
 @ai_assistant_bp.route('/models', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_models():
     """获取大模型列表"""
     # 从大模型配置表查询
@@ -460,6 +472,7 @@ def get_models():
 
 @ai_assistant_bp.route('/mcp-configs', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_mcp_configs():
     """获取MCP配置列表"""
     # 从MCP配置表查询

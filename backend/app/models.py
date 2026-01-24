@@ -428,3 +428,68 @@ class MCPConfig(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+class OperationLog(db.Model):
+    """操作日志模型"""
+    __tablename__ = 'operation_logs'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), comment='用户ID')
+    username = db.Column(db.String(80), comment='用户名')
+    action = db.Column(db.String(50), nullable=False, comment='操作类型: login/logout/create/update/delete/query/export')
+    module = db.Column(db.String(50), nullable=False, comment='模块名称')
+    description = db.Column(db.String(500), comment='操作描述')
+    
+    # 请求信息
+    method = db.Column(db.String(10), comment='请求方法: GET/POST/PUT/DELETE')
+    path = db.Column(db.String(500), comment='请求路径')
+    params = db.Column(db.Text, comment='请求参数JSON')
+    
+    # 响应信息
+    status_code = db.Column(db.Integer, comment='响应状态码')
+    response_time = db.Column(db.Float, comment='响应时间(毫秒)')
+    error_msg = db.Column(db.Text, comment='错误信息')
+    
+    # 客户端信息
+    ip = db.Column(db.String(50), comment='IP地址')
+    user_agent = db.Column(db.String(500), comment='User-Agent')
+    browser = db.Column(db.String(100), comment='浏览器')
+    browser_version = db.Column(db.String(50), comment='浏览器版本')
+    os = db.Column(db.String(100), comment='操作系统')
+    os_version = db.Column(db.String(50), comment='系统版本')
+    device = db.Column(db.String(50), comment='设备类型: desktop/mobile/tablet')
+    
+    # 状态
+    status = db.Column(db.String(20), default='success', comment='操作状态: success/fail/error')
+    
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间', index=True)
+    
+    # 关联用户
+    user = db.relationship('User', backref=db.backref('operation_logs', lazy='dynamic'))
+    
+    def to_dict(self):
+        """转换为字典"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'action': self.action,
+            'module': self.module,
+            'description': self.description,
+            'method': self.method,
+            'path': self.path,
+            'params': self.params,
+            'status_code': self.status_code,
+            'response_time': self.response_time,
+            'error_msg': self.error_msg,
+            'ip': self.ip,
+            'user_agent': self.user_agent,
+            'browser': self.browser,
+            'browser_version': self.browser_version,
+            'os': self.os,
+            'os_version': self.os_version,
+            'device': self.device,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

@@ -4,10 +4,12 @@
 import io
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
+from flask_jwt_extended import jwt_required
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from app import db
 from app.models import TestCase, Requirement
+from app.middlewares import log_operation
 
 testcase_bp = Blueprint('testcase', __name__)
 
@@ -33,6 +35,8 @@ def ensure_string(value, separator='\n'):
 
 
 @testcase_bp.route('', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_testcases():
     """获取测试用例列表"""
     page = request.args.get('page', 1, type=int)
@@ -77,6 +81,8 @@ def get_testcases():
 
 
 @testcase_bp.route('/<int:testcase_id>', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_testcase(testcase_id):
     """获取测试用例详情"""
     testcase = TestCase.query.get_or_404(testcase_id)
@@ -88,6 +94,8 @@ def get_testcase(testcase_id):
 
 
 @testcase_bp.route('', methods=['POST'])
+@jwt_required()
+@log_operation
 def create_testcase():
     """创建测试用例"""
     data = request.get_json()
@@ -129,6 +137,8 @@ def create_testcase():
 
 
 @testcase_bp.route('/batch', methods=['POST'])
+@jwt_required()
+@log_operation
 def create_testcases_batch():
     """批量创建测试用例"""
     data = request.get_json()
@@ -166,6 +176,8 @@ def create_testcases_batch():
 
 
 @testcase_bp.route('/<int:testcase_id>', methods=['PUT'])
+@jwt_required()
+@log_operation
 def update_testcase(testcase_id):
     """更新测试用例"""
     testcase = TestCase.query.get_or_404(testcase_id)
@@ -196,6 +208,8 @@ def update_testcase(testcase_id):
 
 
 @testcase_bp.route('/<int:testcase_id>', methods=['DELETE'])
+@jwt_required()
+@log_operation
 def delete_testcase(testcase_id):
     """删除测试用例"""
     testcase = TestCase.query.get_or_404(testcase_id)
@@ -209,6 +223,8 @@ def delete_testcase(testcase_id):
 
 
 @testcase_bp.route('/stats', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_stats():
     """获取测试用例统计"""
     total = TestCase.query.count()
@@ -234,6 +250,8 @@ def get_stats():
 
 
 @testcase_bp.route('/export', methods=['GET'])
+@jwt_required()
+@log_operation
 def export_testcases():
     """导出测试用例为Excel"""
     # 获取筛选参数
@@ -337,6 +355,8 @@ def export_testcases():
 
 
 @testcase_bp.route('/template', methods=['GET'])
+@jwt_required()
+@log_operation
 def download_template():
     """下载导入模板"""
     wb = Workbook()
@@ -412,6 +432,8 @@ def download_template():
 
 
 @testcase_bp.route('/import', methods=['POST'])
+@jwt_required()
+@log_operation
 def import_testcases():
     """导入测试用例"""
     if 'file' not in request.files:

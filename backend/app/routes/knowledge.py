@@ -8,11 +8,13 @@ from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from app import db
 from app.models import Knowledge
+from app.middlewares import log_operation
 
 knowledge_bp = Blueprint('knowledge', __name__)
 
 
 @knowledge_bp.route('', methods=['GET'])
+@log_operation
 def get_knowledges():
     """获取知识库列表"""
     page = request.args.get('page', 1, type=int)
@@ -51,6 +53,7 @@ def get_knowledges():
 
 
 @knowledge_bp.route('/all', methods=['GET'])
+@log_operation
 def get_all_knowledges():
     """获取所有启用的知识库（用于下拉选择）"""
     knowledges = Knowledge.query.filter(Knowledge.is_active == True).order_by(
@@ -65,6 +68,7 @@ def get_all_knowledges():
 
 
 @knowledge_bp.route('/batch', methods=['GET'])
+@log_operation
 def get_knowledges_by_ids():
     """根据ID列表获取知识库内容"""
     ids_str = request.args.get('ids', '')
@@ -89,6 +93,7 @@ def get_knowledges_by_ids():
 
 
 @knowledge_bp.route('/export', methods=['GET'])
+@log_operation
 def export_knowledges():
     """导出知识库为Excel"""
     # 获取筛选参数
@@ -170,6 +175,7 @@ def export_knowledges():
 
 
 @knowledge_bp.route('/template', methods=['GET'])
+@log_operation
 def download_template():
     """下载导入模板"""
     wb = Workbook()
@@ -244,6 +250,7 @@ def download_template():
 
 
 @knowledge_bp.route('/import', methods=['POST'])
+@log_operation
 def import_knowledges():
     """导入知识库"""
     if 'file' not in request.files:
@@ -335,6 +342,7 @@ def import_knowledges():
 
 
 @knowledge_bp.route('/<int:knowledge_id>', methods=['GET'])
+@log_operation
 def get_knowledge(knowledge_id):
     """获取知识库详情"""
     knowledge = Knowledge.query.get_or_404(knowledge_id)
@@ -346,6 +354,7 @@ def get_knowledge(knowledge_id):
 
 
 @knowledge_bp.route('', methods=['POST'])
+@log_operation
 def create_knowledge():
     """创建知识库"""
     data = request.get_json()
@@ -375,6 +384,7 @@ def create_knowledge():
 
 
 @knowledge_bp.route('/<int:knowledge_id>', methods=['PUT'])
+@log_operation
 def update_knowledge(knowledge_id):
     """更新知识库"""
     knowledge = Knowledge.query.get_or_404(knowledge_id)
@@ -403,6 +413,7 @@ def update_knowledge(knowledge_id):
 
 
 @knowledge_bp.route('/<int:knowledge_id>', methods=['DELETE'])
+@log_operation
 def delete_knowledge(knowledge_id):
     """删除知识库"""
     knowledge = Knowledge.query.get_or_404(knowledge_id)

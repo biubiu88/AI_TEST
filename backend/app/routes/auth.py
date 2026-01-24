@@ -9,6 +9,7 @@ from flask_jwt_extended import (
 )
 from app import db
 from app.models import User, Menu, Permission, Role
+from app.middlewares import log_operation
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -23,6 +24,7 @@ def make_response(code=0, message='success', data=None):
 
 
 @auth_bp.route('/register', methods=['POST'])
+@log_operation
 def register():
     """用户注册"""
     data = request.get_json()
@@ -73,6 +75,7 @@ def register():
 
 
 @auth_bp.route('/login', methods=['POST'])
+@log_operation
 def login():
     """用户登录"""
     data = request.get_json()
@@ -136,6 +139,7 @@ def login():
 
 @auth_bp.route('/refresh', methods=['POST'])
 @jwt_required(refresh=True)
+@log_operation
 def refresh():
     """刷新访问令牌"""
     current_user_id = get_jwt_identity()
@@ -155,6 +159,7 @@ def refresh():
 
 @auth_bp.route('/profile', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_profile():
     """获取当前用户信息"""
     current_user_id = get_jwt_identity()
@@ -168,6 +173,7 @@ def get_profile():
 
 @auth_bp.route('/profile', methods=['PUT'])
 @jwt_required()
+@log_operation
 def update_profile():
     """更新用户信息"""
     current_user_id = get_jwt_identity()
@@ -191,6 +197,7 @@ def update_profile():
 
 @auth_bp.route('/change-password', methods=['POST'])
 @jwt_required()
+@log_operation
 def change_password():
     """修改密码"""
     current_user_id = get_jwt_identity()
@@ -223,6 +230,7 @@ def change_password():
 
 
 @auth_bp.route('/reset-password', methods=['POST'])
+@log_operation
 def reset_password():
     """重置密码（通过邮箱）"""
     data = request.get_json()
@@ -255,6 +263,7 @@ def reset_password():
 
 @auth_bp.route('/logout', methods=['POST'])
 @jwt_required()
+@log_operation
 def logout():
     """用户登出"""
     # JWT是无状态的，这里可以实现黑名单机制

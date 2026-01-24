@@ -2,13 +2,17 @@
 需求文档路由
 """
 from flask import Blueprint, request, jsonify
+from flask_jwt_extended import jwt_required
 from app import db
 from app.models import Requirement
+from app.middlewares import log_operation
 
 requirement_bp = Blueprint('requirement', __name__)
 
 
 @requirement_bp.route('', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_requirements():
     """获取需求列表"""
     page = request.args.get('page', 1, type=int)
@@ -47,6 +51,8 @@ def get_requirements():
 
 
 @requirement_bp.route('/<int:requirement_id>', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_requirement(requirement_id):
     """获取需求详情"""
     requirement = Requirement.query.get_or_404(requirement_id)
@@ -58,6 +64,8 @@ def get_requirement(requirement_id):
 
 
 @requirement_bp.route('', methods=['POST'])
+@jwt_required()
+@log_operation
 def create_requirement():
     """创建需求"""
     data = request.get_json()
@@ -84,6 +92,8 @@ def create_requirement():
 
 
 @requirement_bp.route('/<int:requirement_id>', methods=['PUT'])
+@jwt_required()
+@log_operation
 def update_requirement(requirement_id):
     """更新需求"""
     requirement = Requirement.query.get_or_404(requirement_id)
@@ -110,6 +120,8 @@ def update_requirement(requirement_id):
 
 
 @requirement_bp.route('/<int:requirement_id>', methods=['DELETE'])
+@jwt_required()
+@log_operation
 def delete_requirement(requirement_id):
     """删除需求"""
     requirement = Requirement.query.get_or_404(requirement_id)
@@ -123,6 +135,8 @@ def delete_requirement(requirement_id):
 
 
 @requirement_bp.route('/modules', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_modules():
     """获取所有模块"""
     modules = db.session.query(Requirement.module).distinct().filter(

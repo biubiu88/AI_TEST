@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import Requirement, TestCase, Prompt, Knowledge, LLMConfig
 from app.services.ai_service import AIService
+from app.middlewares import log_operation
 
 ai_bp = Blueprint('ai', __name__)
 
@@ -112,6 +113,7 @@ def parse_document_content(file_path, filename):
 
 
 @ai_bp.route('/generate', methods=['POST'])
+@log_operation
 def generate_testcases():
     """根据需求生成测试用例"""
     data = request.get_json()
@@ -191,6 +193,7 @@ def generate_testcases():
 
 
 @ai_bp.route('/preview', methods=['POST'])
+@log_operation
 def preview_testcases():
     """预览AI生成的测试用例（不保存）"""
     data = request.get_json()
@@ -247,6 +250,7 @@ def preview_testcases():
 
 
 @ai_bp.route('/parse-document', methods=['POST'])
+@log_operation
 def parse_document():
     """解析上传的文档"""
     if 'file' not in request.files:

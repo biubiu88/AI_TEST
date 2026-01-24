@@ -4,6 +4,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from app import db
 from app.models import LLMConfig
+from app.middlewares import log_operation
 
 try:
     from openai import OpenAI
@@ -80,6 +81,7 @@ PROVIDERS = {
 
 
 @llm_config_bp.route('', methods=['GET'])
+@log_operation
 def get_llm_configs():
     """获取大模型配置列表"""
     page = request.args.get('page', 1, type=int)
@@ -108,6 +110,7 @@ def get_llm_configs():
 
 
 @llm_config_bp.route('/all', methods=['GET'])
+@log_operation
 def get_all_llm_configs():
     """获取所有启用的大模型配置（用于下拉选择）"""
     configs = LLMConfig.query.filter(
@@ -122,6 +125,7 @@ def get_all_llm_configs():
 
 
 @llm_config_bp.route('/providers', methods=['GET'])
+@log_operation
 def get_providers():
     """获取支持的大模型供应商列表"""
     return jsonify({
@@ -132,6 +136,7 @@ def get_providers():
 
 
 @llm_config_bp.route('/<int:id>', methods=['GET'])
+@log_operation
 def get_llm_config(id):
     """获取单个大模型配置"""
     config = LLMConfig.query.get_or_404(id)
@@ -143,6 +148,7 @@ def get_llm_config(id):
 
 
 @llm_config_bp.route('', methods=['POST'])
+@log_operation
 def create_llm_config():
     """创建大模型配置"""
     data = request.get_json()
@@ -184,6 +190,7 @@ def create_llm_config():
 
 
 @llm_config_bp.route('/<int:id>', methods=['PUT'])
+@log_operation
 def update_llm_config(id):
     """更新大模型配置"""
     config = LLMConfig.query.get_or_404(id)
@@ -228,6 +235,7 @@ def update_llm_config(id):
 
 
 @llm_config_bp.route('/<int:id>', methods=['DELETE'])
+@log_operation
 def delete_llm_config(id):
     """删除大模型配置"""
     config = LLMConfig.query.get_or_404(id)
@@ -241,6 +249,7 @@ def delete_llm_config(id):
 
 
 @llm_config_bp.route('/<int:id>/default', methods=['PUT'])
+@log_operation
 def set_default_config(id):
     """设置为默认配置"""
     config = LLMConfig.query.get_or_404(id)
@@ -259,6 +268,7 @@ def set_default_config(id):
 
 
 @llm_config_bp.route('/models', methods=['POST'])
+@log_operation
 def fetch_models():
     """根据配置获取可用模型列表"""
     data = request.get_json()
@@ -302,6 +312,7 @@ def fetch_models():
 
 
 @llm_config_bp.route('/test', methods=['POST'])
+@log_operation
 def test_config():
     """测试大模型配置连接"""
     data = request.get_json()

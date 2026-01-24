@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import Role, Permission, Menu, User
+from app.middlewares import log_operation
 
 permission_bp = Blueprint('permission', __name__)
 
@@ -38,6 +39,7 @@ def admin_required(fn):
 
 @permission_bp.route('/roles', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_roles():
     """获取角色列表"""
     page = request.args.get('page', 1, type=int)
@@ -66,6 +68,7 @@ def get_roles():
 
 @permission_bp.route('/roles/all', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_all_roles():
     """获取所有启用的角色"""
     roles = Role.query.filter(Role.status == 1).order_by(Role.sort.asc()).all()
@@ -74,6 +77,7 @@ def get_all_roles():
 
 @permission_bp.route('/roles/<int:role_id>', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_role(role_id):
     """获取角色详情"""
     role = Role.query.get(role_id)
@@ -84,6 +88,7 @@ def get_role(role_id):
 
 @permission_bp.route('/roles', methods=['POST'])
 @admin_required
+@log_operation
 def create_role():
     """创建角色"""
     data = request.get_json()
@@ -128,6 +133,7 @@ def create_role():
 
 @permission_bp.route('/roles/<int:role_id>', methods=['PUT'])
 @admin_required
+@log_operation
 def update_role(role_id):
     """更新角色"""
     role = Role.query.get(role_id)
@@ -182,6 +188,7 @@ def update_role(role_id):
 
 @permission_bp.route('/roles/<int:role_id>', methods=['DELETE'])
 @admin_required
+@log_operation
 def delete_role(role_id):
     """删除角色"""
     role = Role.query.get(role_id)
@@ -201,6 +208,7 @@ def delete_role(role_id):
 
 @permission_bp.route('/permissions', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_permissions():
     """获取权限列表"""
     page = request.args.get('page', 1, type=int)
@@ -227,6 +235,7 @@ def get_permissions():
 
 @permission_bp.route('/permissions/all', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_all_permissions():
     """获取所有权限"""
     permissions = Permission.query.all()
@@ -235,6 +244,7 @@ def get_all_permissions():
 
 @permission_bp.route('/permissions', methods=['POST'])
 @admin_required
+@log_operation
 def create_permission():
     """创建权限"""
     data = request.get_json()
@@ -263,6 +273,7 @@ def create_permission():
 
 @permission_bp.route('/permissions/<int:perm_id>', methods=['PUT'])
 @admin_required
+@log_operation
 def update_permission(perm_id):
     """更新权限"""
     permission = Permission.query.get(perm_id)
@@ -291,6 +302,7 @@ def update_permission(perm_id):
 
 @permission_bp.route('/permissions/<int:perm_id>', methods=['DELETE'])
 @admin_required
+@log_operation
 def delete_permission(perm_id):
     """删除权限"""
     permission = Permission.query.get(perm_id)
@@ -307,6 +319,7 @@ def delete_permission(perm_id):
 
 @permission_bp.route('/menus', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_menus():
     """获取菜单列表（树形结构）"""
     menus = Menu.query.filter(Menu.status == 1).order_by(Menu.sort.asc()).all()
@@ -316,6 +329,7 @@ def get_menus():
 
 @permission_bp.route('/menus/all', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_all_menus():
     """获取所有菜单（平铺）"""
     menus = Menu.query.order_by(Menu.sort.asc()).all()
@@ -324,6 +338,7 @@ def get_all_menus():
 
 @permission_bp.route('/menus/<int:menu_id>', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_menu(menu_id):
     """获取菜单详情"""
     menu = Menu.query.get(menu_id)
@@ -334,6 +349,7 @@ def get_menu(menu_id):
 
 @permission_bp.route('/menus', methods=['POST'])
 @admin_required
+@log_operation
 def create_menu():
     """创建菜单"""
     data = request.get_json()
@@ -367,6 +383,7 @@ def create_menu():
 
 @permission_bp.route('/menus/<int:menu_id>', methods=['PUT'])
 @admin_required
+@log_operation
 def update_menu(menu_id):
     """更新菜单"""
     menu = Menu.query.get(menu_id)
@@ -411,6 +428,7 @@ def update_menu(menu_id):
 
 @permission_bp.route('/menus/<int:menu_id>', methods=['DELETE'])
 @admin_required
+@log_operation
 def delete_menu(menu_id):
     """删除菜单"""
     menu = Menu.query.get(menu_id)
@@ -432,6 +450,7 @@ def delete_menu(menu_id):
 
 @permission_bp.route('/users/<int:user_id>/roles', methods=['GET'])
 @admin_required
+@log_operation
 def get_user_roles(user_id):
     """获取用户角色"""
     user = User.query.get(user_id)
@@ -442,6 +461,7 @@ def get_user_roles(user_id):
 
 @permission_bp.route('/users/<int:user_id>/roles', methods=['PUT'])
 @admin_required
+@log_operation
 def set_user_roles(user_id):
     """设置用户角色"""
     user = User.query.get(user_id)
@@ -463,6 +483,7 @@ def set_user_roles(user_id):
 
 @permission_bp.route('/user/menus', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_user_menus():
     """获取当前用户的菜单"""
     current_user_id = get_jwt_identity()
@@ -483,6 +504,7 @@ def get_user_menus():
 
 @permission_bp.route('/user/permissions', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_user_permissions():
     """获取当前用户的权限"""
     current_user_id = get_jwt_identity()

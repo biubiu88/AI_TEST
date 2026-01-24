@@ -5,6 +5,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import User, Role
+from app.middlewares import log_operation
 
 users_bp = Blueprint('users', __name__)
 
@@ -36,6 +37,7 @@ def admin_required(fn):
 
 @users_bp.route('', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_users():
     """获取用户列表"""
     page = request.args.get('page', 1, type=int)
@@ -75,6 +77,7 @@ def get_users():
 
 @users_bp.route('/<int:user_id>', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_user(user_id):
     """获取用户详情"""
     user = User.query.get(user_id)
@@ -88,6 +91,7 @@ def get_user(user_id):
 
 @users_bp.route('', methods=['POST'])
 @admin_required
+@log_operation
 def create_user():
     """创建用户"""
     data = request.get_json()
@@ -139,6 +143,7 @@ def create_user():
 
 @users_bp.route('/<int:user_id>', methods=['PUT'])
 @admin_required
+@log_operation
 def update_user(user_id):
     """更新用户"""
     user = User.query.get(user_id)
@@ -177,6 +182,7 @@ def update_user(user_id):
 
 @users_bp.route('/<int:user_id>', methods=['DELETE'])
 @admin_required
+@log_operation
 def delete_user(user_id):
     """删除用户"""
     user = User.query.get(user_id)
@@ -195,6 +201,7 @@ def delete_user(user_id):
 
 @users_bp.route('/<int:user_id>/reset-password', methods=['POST'])
 @admin_required
+@log_operation
 def reset_password(user_id):
     """重置用户密码"""
     user = User.query.get(user_id)

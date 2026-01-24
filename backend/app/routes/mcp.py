@@ -7,6 +7,7 @@ from datetime import datetime
 from app import db
 from app.models import User
 from app.models import MCPConfig
+from app.middlewares import log_operation
 
 mcp_bp = Blueprint('mcp', __name__)
 
@@ -22,6 +23,7 @@ def make_response(code=0, message='success', data=None):
 
 @mcp_bp.route('', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_mcp_configs():
     """获取MCP配置列表"""
     page = request.args.get('page', 1, type=int)
@@ -71,6 +73,7 @@ def get_mcp_configs():
 
 @mcp_bp.route('/all', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_all_mcp_configs():
     """获取所有启用的MCP配置"""
     configs = MCPConfig.query.filter(
@@ -91,6 +94,7 @@ def get_all_mcp_configs():
 
 @mcp_bp.route('/<int:config_id>', methods=['GET'])
 @jwt_required()
+@log_operation
 def get_mcp_config(config_id):
     """获取MCP配置详情"""
     config = MCPConfig.query.get(config_id)
@@ -115,6 +119,7 @@ def get_mcp_config(config_id):
 
 @mcp_bp.route('', methods=['POST'])
 @jwt_required()
+@log_operation
 def create_mcp_config():
     """创建MCP配置"""
     data = request.get_json()
@@ -159,6 +164,7 @@ def create_mcp_config():
 
 @mcp_bp.route('/<int:config_id>', methods=['PUT'])
 @jwt_required()
+@log_operation
 def update_mcp_config(config_id):
     """更新MCP配置"""
     config = MCPConfig.query.get(config_id)
@@ -206,6 +212,7 @@ def update_mcp_config(config_id):
 
 @mcp_bp.route('/<int:config_id>', methods=['DELETE'])
 @jwt_required()
+@log_operation
 def delete_mcp_config(config_id):
     """删除MCP配置"""
     config = MCPConfig.query.get(config_id)
@@ -220,6 +227,7 @@ def delete_mcp_config(config_id):
 
 @mcp_bp.route('/<int:config_id>/test', methods=['POST'])
 @jwt_required()
+@log_operation
 def test_mcp_config(config_id):
     """测试MCP配置连接"""
     config = MCPConfig.query.get(config_id)

@@ -4,15 +4,19 @@
 import io
 from datetime import datetime
 from flask import Blueprint, request, jsonify, send_file
+from flask_jwt_extended import jwt_required
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from app import db
 from app.models import Prompt
+from app.middlewares import log_operation
 
 prompt_bp = Blueprint('prompt', __name__)
 
 
 @prompt_bp.route('', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_prompts():
     """获取提示词列表"""
     page = request.args.get('page', 1, type=int)
@@ -51,6 +55,8 @@ def get_prompts():
 
 
 @prompt_bp.route('/all', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_all_prompts():
     """获取所有启用的提示词（用于下拉选择）"""
     prompts = Prompt.query.filter(Prompt.is_active == True).order_by(
@@ -65,6 +71,8 @@ def get_all_prompts():
 
 
 @prompt_bp.route('/export', methods=['GET'])
+@jwt_required()
+@log_operation
 def export_prompts():
     """导出提示词为Excel"""
     # 获取筛选参数
@@ -145,6 +153,8 @@ def export_prompts():
 
 
 @prompt_bp.route('/template', methods=['GET'])
+@jwt_required()
+@log_operation
 def download_template():
     """下载导入模板"""
     wb = Workbook()
@@ -218,6 +228,8 @@ def download_template():
 
 
 @prompt_bp.route('/import', methods=['POST'])
+@jwt_required()
+@log_operation
 def import_prompts():
     """导入提示词"""
     if 'file' not in request.files:
@@ -305,6 +317,8 @@ def import_prompts():
 
 
 @prompt_bp.route('/<int:prompt_id>', methods=['GET'])
+@jwt_required()
+@log_operation
 def get_prompt(prompt_id):
     """获取提示词详情"""
     prompt = Prompt.query.get_or_404(prompt_id)
@@ -316,6 +330,8 @@ def get_prompt(prompt_id):
 
 
 @prompt_bp.route('', methods=['POST'])
+@jwt_required()
+@log_operation
 def create_prompt():
     """创建提示词"""
     data = request.get_json()
@@ -349,6 +365,8 @@ def create_prompt():
 
 
 @prompt_bp.route('/<int:prompt_id>', methods=['PUT'])
+@jwt_required()
+@log_operation
 def update_prompt(prompt_id):
     """更新提示词"""
     prompt = Prompt.query.get_or_404(prompt_id)
@@ -381,6 +399,8 @@ def update_prompt(prompt_id):
 
 
 @prompt_bp.route('/<int:prompt_id>', methods=['DELETE'])
+@jwt_required()
+@log_operation
 def delete_prompt(prompt_id):
     """删除提示词"""
     prompt = Prompt.query.get_or_404(prompt_id)
