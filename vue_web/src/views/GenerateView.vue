@@ -202,11 +202,11 @@ const handleSave = async () => {
     // 跳转到测试用例列表
     if (requirementInputType.value === 'select' && generateForm.requirement_id) {
       router.push({
-        path: '/testcases',
+        path: '/testing/testcases',
         query: { requirementId: generateForm.requirement_id }
       })
     } else {
-      router.push('/testcases')
+      router.push('/testing/testcases')
     }
   } catch (e) {
     console.error(e)
@@ -227,11 +227,11 @@ const handleGenerateAndSave = async () => {
     
     if (requirementInputType.value === 'select' && generateForm.requirement_id) {
       router.push({
-        path: '/testcases',
+        path: '/testing/testcases',
         query: { requirementId: generateForm.requirement_id }
       })
     } else {
-      router.push('/testcases')
+      router.push('/testing/testcases')
     }
   } catch (e) {
     console.error(e)

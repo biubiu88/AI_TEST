@@ -52,11 +52,6 @@ const reviewFormRules = {
 const detailVisible = ref(false)
 const currentDetail = ref(null)
 
-// 评论相关
-const commentDialogVisible = ref(false)
-const commentList = ref([])
-const newComment = ref('')
-
 // 选项配置
 const statusOptions = [
   { label: '待评审', value: 'pending' },
@@ -180,55 +175,6 @@ const handleDeleteReview = async (row) => {
     await reviewStore.deleteReview(row.id)
     ElMessage.success('删除成功')
     loadData()
-  } catch (e) {
-    if (e !== 'cancel') {
-      console.error(e)
-    }
-  }
-}
-
-// 打开评论对话框
-const handleOpenComments = async (row) => {
-  try {
-    const comments = await reviewStore.fetchComments(row.id)
-    commentList.value = comments
-    currentDetail.value = row
-    commentDialogVisible.value = true
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-// 添加评论
-const handleAddComment = async () => {
-  if (!newComment.value.trim()) {
-    ElMessage.warning('请输入评论内容')
-    return
-  }
-  
-  try {
-    await reviewStore.addComment(currentDetail.value.id, {
-      content: newComment.value
-    })
-    ElMessage.success('评论添加成功')
-    newComment.value = ''
-    // 刷新评论列表
-    const comments = await reviewStore.fetchComments(currentDetail.value.id)
-    commentList.value = comments
-  } catch (e) {
-    console.error(e)
-  }
-}
-
-// 删除评论
-const handleDeleteComment = async (commentId) => {
-  try {
-    await ElMessageBox.confirm('确定要删除这条评论吗？', '提示', { type: 'warning' })
-    await reviewStore.deleteComment(commentId)
-    ElMessage.success('删除成功')
-    // 刷新评论列表
-    const comments = await reviewStore.fetchComments(currentDetail.value.id)
-    commentList.value = comments
   } catch (e) {
     if (e !== 'cancel') {
       console.error(e)
@@ -648,10 +594,9 @@ onMounted(() => {
             {{ row.reviewed_at?.replace('T', ' ').slice(0, 19) || '-' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="handleViewDetail(row)">详情</el-button>
-            <el-button type="success" link @click="handleOpenComments(row)">评论</el-button>
             <el-button type="warning" link @click="handleEditReview(row)">编辑</el-button>
             <el-button type="danger" link @click="handleDeleteReview(row)">删除</el-button>
           </template>
@@ -818,55 +763,6 @@ onMounted(() => {
       <template #footer>
         <el-button @click="detailVisible = false">关闭</el-button>
         <el-button type="primary" @click="handleEditReview(currentDetail); detailVisible = false">编辑</el-button>
-      </template>
-    </el-dialog>
-
-    <!-- 评论对话框 -->
-    <el-dialog
-      v-model="commentDialogVisible"
-      title="评审评论"
-      width="600px"
-    >
-      <div class="comment-list">
-        <div v-for="comment in commentList" :key="comment.id" class="comment-item">
-          <div class="comment-header">
-            <span class="comment-user">{{ comment.user_name }}</span>
-            <span class="comment-time">{{ comment.created_at?.replace('T', ' ').slice(0, 19) }}</span>
-          </div>
-          <div class="comment-content">{{ comment.content }}</div>
-          <div class="comment-actions">
-            <el-button
-              type="danger"
-              link
-              size="small"
-              @click="handleDeleteComment(comment.id)"
-            >
-              删除
-            </el-button>
-          </div>
-        </div>
-        
-        <div v-if="commentList.length === 0" class="empty-comments">
-          <el-empty description="暂无评论" />
-        </div>
-      </div>
-      
-      <el-divider />
-      
-      <div class="comment-input">
-        <el-input
-          v-model="newComment"
-          type="textarea"
-          :rows="3"
-          placeholder="请输入评论内容"
-        />
-        <div class="comment-actions">
-          <el-button type="primary" @click="handleAddComment">发送</el-button>
-        </div>
-      </div>
-      
-      <template #footer>
-        <el-button @click="commentDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -1175,59 +1071,6 @@ onMounted(() => {
 .avg-score {
   font-weight: 600;
   color: #409eff;
-}
-
-.comment-list {
-  max-height: 400px;
-  overflow-y: auto;
-  margin-bottom: 16px;
-}
-
-.comment-item {
-  padding: 12px;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-.comment-item:last-child {
-  border-bottom: none;
-}
-
-.comment-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.comment-user {
-  font-weight: 500;
-  color: #303133;
-}
-
-.comment-time {
-  font-size: 12px;
-  color: #909399;
-}
-
-.comment-content {
-  color: #606266;
-  line-height: 1.6;
-  margin-bottom: 8px;
-}
-
-.comment-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.empty-comments {
-  padding: 40px 0;
-}
-
-.comment-input .comment-actions {
-  margin-top: 12px;
-  display: flex;
-  justify-content: flex-end;
 }
 
 /* AI评审相关样式 */
