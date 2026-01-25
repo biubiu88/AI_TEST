@@ -227,6 +227,7 @@ export const userApi = {
 export const logApi = {
   getList: (params) => api.get('/logs', { params }),
   getDetail: (id) => api.get(`/logs/${id}`),
+  getStatistics: () => api.get('/logs/statistics'),
   export: (params) => api.get('/logs/export', { params })
 }
 

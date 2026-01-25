@@ -62,49 +62,39 @@ const selectedShortcut = ref('')
 // 加载统计数据
 const loadStats = async () => {
   try {
-    // 构建请求列表
-    const requests = [
+    const [statsRes, testcaseRes, reqRes, logStatsRes] = await Promise.all([
       testcaseApi.getStats(),
       testcaseApi.getList({ page: 1, per_page: 5 }),
-      requirementApi.getList({ page: 1, per_page: 5 })
-    ]
+      requirementApi.getList({ page: 1, per_page: 5 }),
+      logApi.getStatistics()
+    ])
 
-    // 只有管理员才加载API调用统计数据
-    if (userStore.isAdmin) {
-      requests.push(logApi.getStatistics())
+    if (statsRes.data) {
+      stats.totalTestcases = statsRes.data.total || 0
+      stats.pendingTestcases = statsRes.data.pending || 0
+      stats.aiGeneratedTestcases = statsRes.data.ai_generated || 0
     }
 
-    const results = await Promise.all(requests)
-
-    if (results[0].data) {
-      stats.totalTestcases = results[0].data.total || 0
-      stats.pendingTestcases = results[0].data.pending || 0
-      stats.aiGeneratedTestcases = results[0].data.ai_generated || 0
+    if (testcaseRes.data) {
+      recentTestcases.value = testcaseRes.data.list || []
     }
 
-    if (results[1].data) {
-      recentTestcases.value = results[1].data.list || []
+    if (reqRes.data) {
+      stats.totalRequirements = reqRes.data.total || 0
+      recentRequirements.value = reqRes.data.list || []
     }
 
-    if (results[2].data) {
-      stats.totalRequirements = results[2].data.total || 0
-      recentRequirements.value = results[2].data.list || []
-    }
-
-    // 只有管理员才处理API调用统计数据
-    if (userStore.isAdmin && results[3]?.data) {
-      stats.totalApiCalls = results[3].data.total || 0
-      stats.todayApiCalls = results[3].data.today_count || 0
-      stats.successApiCalls = results[3].data.success_count || 0
-      stats.failApiCalls = results[3].data.fail_count || 0
+    // 加载日志统计数据
+    if (logStatsRes.data) {
+      stats.totalApiCalls = logStatsRes.data.total || 0
+      stats.todayApiCalls = logStatsRes.data.today_count || 0
+      stats.successApiCalls = logStatsRes.data.success_count || 0
+      stats.failApiCalls = logStatsRes.data.fail_count || 0
     }
 
     // 加载图表数据
     loadChartData()
-    // 只有管理员才加载API调用图表数据
-    if (userStore.isAdmin) {
-      loadApiChartData()
-    }
+    loadApiChartData()
   } catch (error) {
     console.error('加载统计数据失败:', error)
   }
@@ -130,7 +120,6 @@ const initChart = (testcases) => {
   // 按日期统计用例数量
   const dateMap = {}
   const today = new Date()
-  const currentYear = today.getFullYear()
   const last7Days = []
   
   for (let i = 6; i >= 0; i--) {
@@ -234,7 +223,7 @@ const handleApiChartTimeRangeChange = (value) => {
   loadApiChartData()
 }
 
-// 初始化API调用柱状图
+// 初始化API调用折线图
 const initApiChart = (logs, timeRange = 'month') => {
   if (!apiChartContainer.value) return
 
@@ -242,39 +231,37 @@ const initApiChart = (logs, timeRange = 'month') => {
   const dateLabels = []
   const dateMap = {}
   const today = new Date()
-  const currentYear = today.getFullYear()
 
   if (timeRange === 'month') {
-    // 月度：显示当前月份每天的数据（1号到月底）
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    // 月度：显示最近30天
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - i)
+      const dateStr = date.toISOString().split('T')[0]
       dateLabels.push(dateStr)
       dateMap[dateStr] = { total: 0, success: 0, fail: 0 }
     }
   } else if (timeRange === 'quarter') {
-    // 季度：显示一年四个季度
-    const quarters = [
-      { name: '一季度', start: new Date(currentYear, 0, 1), end: new Date(currentYear, 2, 31) },
-      { name: '二季度', start: new Date(currentYear, 3, 1), end: new Date(currentYear, 5, 30) },
-      { name: '三季度', start: new Date(currentYear, 6, 1), end: new Date(currentYear, 8, 30) },
-      { name: '四季度', start: new Date(currentYear, 9, 1), end: new Date(currentYear, 11, 31) }
-    ]
+    // 季度：显示最近3个月，按周统计
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(today)
+      date.setDate(date.getDate() - (i * 7))
+      const weekStart = new Date(date)
+      weekStart.setDate(date.getDate() - date.getDay())
+      const weekEnd = new Date(weekStart)
+      weekEnd.setDate(weekStart.getDate() + 6)
 
-    quarters.forEach(quarter => {
-      dateLabels.push(quarter.name)
-      dateMap[quarter.name] = { total: 0, success: 0, fail: 0, startDate: quarter.start, endDate: quarter.end }
-    })
-  } else if (timeRange === 'year') {
-    // 年度：显示从2026年开始的年份
-    const startYear = 2026
-    for (let year = startYear; year <= currentYear; year++) {
-      const dateStr = `${year}年`
+      const dateStr = `${weekStart.getMonth() + 1}/${weekStart.getDate()}-${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`
       dateLabels.push(dateStr)
-      dateMap[dateStr] = { total: 0, success: 0, fail: 0, startDate: new Date(year, 0, 1), endDate: new Date(year, 11, 31) }
+      dateMap[dateStr] = { total: 0, success: 0, fail: 0, startDate: weekStart, endDate: weekEnd }
+    }
+  } else if (timeRange === 'year') {
+    // 年度：显示最近12个月
+    for (let i = 11; i >= 0; i--) {
+      const date = new Date(today.getFullYear(), today.getMonth() - i, 1)
+      const dateStr = `${date.getFullYear()}/${date.getMonth() + 1}`
+      dateLabels.push(dateStr)
+      dateMap[dateStr] = { total: 0, success: 0, fail: 0, startDate: date, endDate: new Date(date.getFullYear(), date.getMonth() + 1, 0) }
     }
   }
 
@@ -294,7 +281,7 @@ const initApiChart = (logs, timeRange = 'month') => {
           }
         }
       } else if (timeRange === 'quarter') {
-        // 按季度统计
+        // 按周统计
         for (const label of dateLabels) {
           const range = dateMap[label]
           if (logDate >= range.startDate && logDate <= range.endDate) {
@@ -308,9 +295,8 @@ const initApiChart = (logs, timeRange = 'month') => {
           }
         }
       } else if (timeRange === 'year') {
-        // 按年统计
-        const year = logDate.getFullYear()
-        const dateStr = `${year}年`
+        // 按月统计
+        const dateStr = `${logDate.getFullYear()}/${logDate.getMonth() + 1}`
         if (dateMap.hasOwnProperty(dateStr)) {
           dateMap[dateStr].total++
           if (log.status === 'success') {
@@ -338,7 +324,10 @@ const initApiChart = (logs, timeRange = 'month') => {
     tooltip: {
       trigger: 'axis',
       axisPointer: {
-        type: 'shadow'
+        type: 'cross',
+        label: {
+          backgroundColor: '#6a7985'
+        }
       }
     },
     legend: {
@@ -353,11 +342,11 @@ const initApiChart = (logs, timeRange = 'month') => {
     },
     xAxis: {
       type: 'category',
-      boundaryGap: timeRange === 'month' ? false : true,
+      boundaryGap: false,
       data: dateLabels,
       axisLabel: {
-        rotate: timeRange === 'month' ? 45 : 0,
-        interval: timeRange === 'month' ? 2 : 0
+        rotate: timeRange === 'year' ? 0 : 0,
+        interval: timeRange === 'month' ? 4 : timeRange === 'quarter' ? 0 : 0
       }
     },
     yAxis: {
@@ -367,35 +356,47 @@ const initApiChart = (logs, timeRange = 'month') => {
     series: [
       {
         name: '总调用',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
+        type: 'line',
+        smooth: true,
         data: totalValues,
         itemStyle: {
-          color: '#409eff',
-          borderRadius: [4, 4, 0, 0]
+          color: '#409eff'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(64, 158, 255, 0.3)' },
+            { offset: 1, color: 'rgba(64, 158, 255, 0.05)' }
+          ])
         }
       },
       {
         name: '成功',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
+        type: 'line',
+        smooth: true,
         data: successValues,
         itemStyle: {
-          color: '#67c23a',
-          borderRadius: [4, 4, 0, 0]
+          color: '#67c23a'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
+            { offset: 1, color: 'rgba(103, 194, 58, 0.05)' }
+          ])
         }
       },
       {
         name: '失败',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
+        type: 'line',
+        smooth: true,
         data: failValues,
         itemStyle: {
-          color: '#f56c6c',
-          borderRadius: [4, 4, 0, 0]
+          color: '#f56c6c'
+        },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(245, 108, 108, 0.3)' },
+            { offset: 1, color: 'rgba(245, 108, 108, 0.05)' }
+          ])
         }
       }
     ]
@@ -575,11 +576,11 @@ onMounted(() => {
             <div class="stat-number">{{ stats.aiGeneratedTestcases }}</div>
             <div class="stat-label">AI生成</div>
           </div>
-          <div v-if="userStore.isAdmin" class="stat-item">
+          <div class="stat-item">
             <div class="stat-number">{{ stats.todayApiCalls }}</div>
             <div class="stat-label">今日API调用</div>
           </div>
-          <div v-if="userStore.isAdmin" class="stat-item">
+          <div class="stat-item">
             <div class="stat-number">{{ stats.totalApiCalls }}</div>
             <div class="stat-label">总API调用</div>
           </div>
@@ -632,7 +633,7 @@ onMounted(() => {
     </el-card>
 
     <!-- API调用趋势图表 -->
-    <el-card v-if="userStore.isAdmin" class="chart-card">
+    <el-card class="chart-card">
       <template #header>
         <div class="card-header">
           <div class="chart-title">

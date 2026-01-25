@@ -86,6 +86,7 @@ npm install
 
 ```bash
 npm run dev
+npm run dev -- --host 0.0.0.0
 ```
 
 默认访问地址: http://localhost:5173

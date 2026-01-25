@@ -62,49 +62,39 @@ const selectedShortcut = ref('')
 // 加载统计数据
 const loadStats = async () => {
   try {
-    // 构建请求列表
-    const requests = [
+    const [statsRes, testcaseRes, reqRes, logStatsRes] = await Promise.all([
       testcaseApi.getStats(),
       testcaseApi.getList({ page: 1, per_page: 5 }),
-      requirementApi.getList({ page: 1, per_page: 5 })
-    ]
+      requirementApi.getList({ page: 1, per_page: 5 }),
+      logApi.getStatistics()
+    ])
 
-    // 只有管理员才加载API调用统计数据
-    if (userStore.isAdmin) {
-      requests.push(logApi.getStatistics())
+    if (statsRes.data) {
+      stats.totalTestcases = statsRes.data.total || 0
+      stats.pendingTestcases = statsRes.data.pending || 0
+      stats.aiGeneratedTestcases = statsRes.data.ai_generated || 0
     }
 
-    const results = await Promise.all(requests)
-
-    if (results[0].data) {
-      stats.totalTestcases = results[0].data.total || 0
-      stats.pendingTestcases = results[0].data.pending || 0
-      stats.aiGeneratedTestcases = results[0].data.ai_generated || 0
+    if (testcaseRes.data) {
+      recentTestcases.value = testcaseRes.data.list || []
     }
 
-    if (results[1].data) {
-      recentTestcases.value = results[1].data.list || []
+    if (reqRes.data) {
+      stats.totalRequirements = reqRes.data.total || 0
+      recentRequirements.value = reqRes.data.list || []
     }
 
-    if (results[2].data) {
-      stats.totalRequirements = results[2].data.total || 0
-      recentRequirements.value = results[2].data.list || []
-    }
-
-    // 只有管理员才处理API调用统计数据
-    if (userStore.isAdmin && results[3]?.data) {
-      stats.totalApiCalls = results[3].data.total || 0
-      stats.todayApiCalls = results[3].data.today_count || 0
-      stats.successApiCalls = results[3].data.success_count || 0
-      stats.failApiCalls = results[3].data.fail_count || 0
+    // 加载日志统计数据
+    if (logStatsRes.data) {
+      stats.totalApiCalls = logStatsRes.data.total || 0
+      stats.todayApiCalls = logStatsRes.data.today_count || 0
+      stats.successApiCalls = logStatsRes.data.success_count || 0
+      stats.failApiCalls = logStatsRes.data.fail_count || 0
     }
 
     // 加载图表数据
     loadChartData()
-    // 只有管理员才加载API调用图表数据
-    if (userStore.isAdmin) {
-      loadApiChartData()
-    }
+    loadApiChartData()
   } catch (error) {
     console.error('加载统计数据失败:', error)
   }
@@ -130,7 +120,6 @@ const initChart = (testcases) => {
   // 按日期统计用例数量
   const dateMap = {}
   const today = new Date()
-  const currentYear = today.getFullYear()
   const last7Days = []
   
   for (let i = 6; i >= 0; i--) {
@@ -234,224 +223,6 @@ const handleApiChartTimeRangeChange = (value) => {
   loadApiChartData()
 }
 
-// 初始化API调用柱状图
-const initApiChart = (logs, timeRange = 'month') => {
-  if (!apiChartContainer.value) return
-
-  // 根据时间范围生成日期标签
-  const dateLabels = []
-  const dateMap = {}
-  const today = new Date()
-  const currentYear = today.getFullYear()
-
-  if (timeRange === 'month') {
-    // 月度：显示当前月份每天的数据（1号到月底）
-    const year = today.getFullYear()
-    const month = today.getMonth()
-    const daysInMonth = new Date(year, month + 1, 0).getDate()
-
-    for (let day = 1; day <= daysInMonth; day++) {
-      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-      dateLabels.push(dateStr)
-      dateMap[dateStr] = { total: 0, success: 0, fail: 0 }
-    }
-  } else if (timeRange === 'quarter') {
-    // 季度：显示一年四个季度
-    const quarters = [
-      { name: '一季度', start: new Date(currentYear, 0, 1), end: new Date(currentYear, 2, 31) },
-      { name: '二季度', start: new Date(currentYear, 3, 1), end: new Date(currentYear, 5, 30) },
-      { name: '三季度', start: new Date(currentYear, 6, 1), end: new Date(currentYear, 8, 30) },
-      { name: '四季度', start: new Date(currentYear, 9, 1), end: new Date(currentYear, 11, 31) }
-    ]
-
-    quarters.forEach(quarter => {
-      dateLabels.push(quarter.name)
-      dateMap[quarter.name] = { total: 0, success: 0, fail: 0, startDate: quarter.start, endDate: quarter.end }
-    })
-  } else if (timeRange === 'year') {
-    // 年度：显示从2026年开始的年份
-    const startYear = 2026
-    for (let year = startYear; year <= currentYear; year++) {
-      const dateStr = `${year}年`
-      dateLabels.push(dateStr)
-      dateMap[dateStr] = { total: 0, success: 0, fail: 0, startDate: new Date(year, 0, 1), endDate: new Date(year, 11, 31) }
-    }
-  }
-
-  // 统计API调用数量
-  logs.forEach(log => {
-    if (log.created_at) {
-      const logDate = new Date(log.created_at)
-
-      if (timeRange === 'month') {
-        const dateStr = log.created_at.split('T')[0]
-        if (dateMap.hasOwnProperty(dateStr)) {
-          dateMap[dateStr].total++
-          if (log.status === 'success') {
-            dateMap[dateStr].success++
-          } else if (log.status === 'fail' || log.status === 'error') {
-            dateMap[dateStr].fail++
-          }
-        }
-      } else if (timeRange === 'quarter') {
-        // 按季度统计
-        for (const label of dateLabels) {
-          const range = dateMap[label]
-          if (logDate >= range.startDate && logDate <= range.endDate) {
-            range.total++
-            if (log.status === 'success') {
-              range.success++
-            } else if (log.status === 'fail' || log.status === 'error') {
-              range.fail++
-            }
-            break
-          }
-        }
-      } else if (timeRange === 'year') {
-        // 按年统计
-        const year = logDate.getFullYear()
-        const dateStr = `${year}年`
-        if (dateMap.hasOwnProperty(dateStr)) {
-          dateMap[dateStr].total++
-          if (log.status === 'success') {
-            dateMap[dateStr].success++
-          } else if (log.status === 'fail' || log.status === 'error') {
-            dateMap[dateStr].fail++
-          }
-        }
-      }
-    }
-  })
-
-  const totalValues = dateLabels.map(date => dateMap[date].total)
-  const successValues = dateLabels.map(date => dateMap[date].success)
-  const failValues = dateLabels.map(date => dateMap[date].fail)
-
-  // 销毁旧图表
-  if (apiChartInstance) {
-    apiChartInstance.dispose()
-  }
-
-  // 创建新图表
-  apiChartInstance = echarts.init(apiChartContainer.value)
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: {
-        type: 'shadow'
-      }
-    },
-    legend: {
-      data: ['总调用', '成功', '失败'],
-      top: 10
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '3%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      boundaryGap: timeRange === 'month' ? false : true,
-      data: dateLabels,
-      axisLabel: {
-        rotate: timeRange === 'month' ? 45 : 0,
-        interval: timeRange === 'month' ? 2 : 0
-      }
-    },
-    yAxis: {
-      type: 'value',
-      minInterval: 1
-    },
-    series: [
-      {
-        name: '总调用',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
-        data: totalValues,
-        itemStyle: {
-          color: '#409eff',
-          borderRadius: [4, 4, 0, 0]
-        }
-      },
-      {
-        name: '成功',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
-        data: successValues,
-        itemStyle: {
-          color: '#67c23a',
-          borderRadius: [4, 4, 0, 0]
-        }
-      },
-      {
-        name: '失败',
-        type: 'bar',
-        barWidth: timeRange === 'month' ? 'auto' : 30,
-        barCategoryGap: timeRange === 'month' ? '20%' : '60%',
-        data: failValues,
-        itemStyle: {
-          color: '#f56c6c',
-          borderRadius: [4, 4, 0, 0]
-        }
-      }
-    ]
-  }
-  apiChartInstance.setOption(option)
-
-  // 监听窗口大小变化
-  window.addEventListener('resize', () => {
-    apiChartInstance?.resize()
-  })
-}
-
-// 所有快捷入口
-const allShortcuts = [
-  {
-    id: 'testcases',
-    title: '测试用例管理',
-    icon: List,
-    path: '/testing/testcases',
-    desc: '查看和管理所有测试用例',
-    color: '#409eff',
-    permission: 'testcase:view'
-  },
-  {
-    id: 'generate',
-    title: '生成用例',
-    icon: MagicStick,
-    path: '/testing/generate',
-    desc: '使用AI智能生成测试用例',
-    color: '#67c23a',
-    permission: 'ai:generate'
-  },
-  {
-    id: 'requirements',
-    title: '需求管理',
-    icon: Document,
-    path: '/testing/requirements',
-    desc: '管理产品需求和文档',
-    color: '#e6a23c',
-    permission: 'requirement:view'
-  },
-  {
-    id: 'prompts',
-    title: '提示词管理',
-    icon: ChatDotRound,
-    path: '/testing/prompts',
-    desc: '配置AI生成提示词',
-    color: '#f56c6c',
-    permission: 'prompt:view'
-  },
-  {
-    id: 'knowledge',
-    title: '知识库管理',
-    icon: Collection,
-    path: '/knowledge/knowledges',
-    desc: '管理测试知识资产',
     color: '#909399',
     permission: 'knowledge:view'
   },
@@ -575,11 +346,11 @@ onMounted(() => {
             <div class="stat-number">{{ stats.aiGeneratedTestcases }}</div>
             <div class="stat-label">AI生成</div>
           </div>
-          <div v-if="userStore.isAdmin" class="stat-item">
+          <div class="stat-item">
             <div class="stat-number">{{ stats.todayApiCalls }}</div>
             <div class="stat-label">今日API调用</div>
           </div>
-          <div v-if="userStore.isAdmin" class="stat-item">
+          <div class="stat-item">
             <div class="stat-number">{{ stats.totalApiCalls }}</div>
             <div class="stat-label">总API调用</div>
           </div>
@@ -632,7 +403,7 @@ onMounted(() => {
     </el-card>
 
     <!-- API调用趋势图表 -->
-    <el-card v-if="userStore.isAdmin" class="chart-card">
+    <el-card class="chart-card">
       <template #header>
         <div class="card-header">
           <div class="chart-title">
