@@ -262,4 +262,35 @@ export const aiAssistantApi = {
   getModels: () => api.get('/ai-assistant/models')
 }
 
+// 用例评审相关 API
+export const reviewApi = {
+  // 评审管理
+  getList: (params) => api.get('/reviews/list', { params }),
+  getDetail: (id) => api.get(`/reviews/${id}`),
+  getTestcaseReviews: (testcaseId) => api.get(`/reviews/testcase/${testcaseId}`),
+  create: (data) => api.post('/reviews', data),
+  update: (id, data) => api.put(`/reviews/${id}`, data),
+  delete: (id) => api.delete(`/reviews/${id}`),
+  batchCreate: (data) => api.post('/reviews/batch', data),
+  
+  // AI评审
+  aiReview: (data) => api.post('/reviews/ai-review', data),
+  aiReviewPreview: (data) => api.post('/reviews/ai-review-preview', data),
+  
+  // 评审评论
+  getComments: (reviewId) => api.get(`/reviews/${reviewId}/comments`),
+  addComment: (reviewId, data) => api.post(`/reviews/${reviewId}/comments`, data),
+  deleteComment: (commentId) => api.delete(`/reviews/comments/${commentId}`),
+  
+  // 评审模板
+  getTemplates: () => api.get('/reviews/templates'),
+  getTemplate: (id) => api.get(`/reviews/templates/${id}`),
+  createTemplate: (data) => api.post('/reviews/templates', data),
+  updateTemplate: (id, data) => api.put(`/reviews/templates/${id}`, data),
+  deleteTemplate: (id) => api.delete(`/reviews/templates/${id}`),
+  
+  // 统计
+  getStats: () => api.get('/reviews/stats')
+}
+
 export default api

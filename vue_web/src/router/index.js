@@ -79,6 +79,12 @@ export const defaultAsyncRoutes = [
         name: 'Requirements',
         component: () => import('@/views/RequirementView.vue'),
         meta: { title: '需求管理', icon: 'Document' }
+      },
+      {
+        path: 'reviews',
+        name: 'Reviews',
+        component: () => import('@/views/ReviewView.vue'),
+        meta: { title: '用例评审', icon: 'Checked' }
       }
     ]
   },

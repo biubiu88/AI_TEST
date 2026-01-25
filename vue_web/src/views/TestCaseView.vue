@@ -218,7 +218,12 @@ const handleSubmit = async () => {
 
 // 跳转生成页面
 const handleGoGenerate = () => {
-  router.push('/generate')
+  router.push('/testing/generate')
+}
+
+// 跳转AI评审页面
+const handleGoAIReview = () => {
+  router.push('/testing/reviews')
 }
 
 // 导出测试用例
@@ -512,6 +517,10 @@ onMounted(() => {
             <el-button type="success" @click="handleGoGenerate">
               <el-icon><MagicStick /></el-icon>
               AI生成
+            </el-button>
+            <el-button type="primary" @click="handleGoAIReview">
+              <el-icon><MagicStick /></el-icon>
+              AI评审
             </el-button>
             <el-button type="primary" @click="handleAdd">
               <el-icon><Plus /></el-icon>
