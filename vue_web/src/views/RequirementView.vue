@@ -120,7 +120,7 @@ const handleDelete = async (row) => {
 // 生成测试用例
 const handleGenerate = (row) => {
   router.push({
-    path: '/generate',
+    path: '/testing/generate',
     query: { requirementId: row.id }
   })
 }
@@ -128,7 +128,7 @@ const handleGenerate = (row) => {
 // 查看测试用例
 const handleViewTestcases = (row) => {
   router.push({
-    path: '/testcases',
+    path: '/testing/testcases',
     query: { requirementId: row.id }
   })
 }
