@@ -85,6 +85,12 @@ export const defaultAsyncRoutes = [
         name: 'Reviews',
         component: () => import('@/views/ReviewView.vue'),
         meta: { title: '用例评审', icon: 'Checked' }
+      },
+      {
+        path: 'datafactory',
+        name: 'datafactory',
+        component: () => import('@/views/DataFactory.vue'),
+        meta: { title: '数据工厂', icon: 'Checked' }
       }
     ]
   },

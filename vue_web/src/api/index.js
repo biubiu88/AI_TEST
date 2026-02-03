@@ -35,11 +35,18 @@ api.interceptors.response.use(
     }
     
     const { data } = response
-    if (data.code !== 0) {
-      ElMessage.error(data.message || '请求失败')
-      return Promise.reject(new Error(data.message))
+    
+    // 检查是否包含code字段（标准API格式）
+    if ('code' in data) {
+      if (data.code !== 0) {
+        ElMessage.error(data.message || '请求失败')
+        return Promise.reject(new Error(data.message))
+      }
+      return data
+    } else {
+      // 不包含code字段的响应（如data-factory接口），直接返回数据
+      return data
     }
-    return data
   },
   (error) => {
     const status = error.response?.status

@@ -36,6 +36,7 @@ def create_app(config_name: str = 'default') -> Flask:
     from app.routes.mcp import mcp_bp
     from app.routes.ai_assistant import ai_assistant_bp
     from app.routes.review import review_bp
+    from app.routes.data_factory import data_factory_bp
     
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
     app.register_blueprint(requirement_bp, url_prefix='/api/requirements')
@@ -50,6 +51,7 @@ def create_app(config_name: str = 'default') -> Flask:
     app.register_blueprint(mcp_bp, url_prefix='/api/mcp-configs')
     app.register_blueprint(ai_assistant_bp, url_prefix='/api/ai-assistant')
     app.register_blueprint(review_bp, url_prefix='/api/reviews')
+    app.register_blueprint(data_factory_bp, url_prefix='/api/data-factory')
     
     # 健康检查路由
     @app.route('/api/health')
