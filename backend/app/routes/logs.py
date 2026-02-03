@@ -28,7 +28,10 @@ def make_response(code=0, message='success', data=None):
 def get_logs():
     """获取日志列表"""
     page = request.args.get('page', 1, type=int)
-    page_size = request.args.get('pageSize', 10, type=int)
+    # 支持前端传来的 per_page 参数和 pageSize 参数
+    page_size = request.args.get('per_page', None, type=int)
+    if page_size is None:
+        page_size = request.args.get('pageSize', 50, type=int)  # 默认值改为50，与前端一致
     keyword = request.args.get('keyword', '')
     action = request.args.get('action', '')
     module = request.args.get('module', '')
