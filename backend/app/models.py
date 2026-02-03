@@ -670,3 +670,54 @@ class ReviewTemplate(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+
+class DataFactoryHistory(db.Model):
+    """数据工厂历史记录模型"""
+    __tablename__ = 'data_factory_history'
+    
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True, comment='历史记录ID')
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True, comment='用户ID')
+    username = db.Column(db.String(80), comment='用户名')
+    
+    # 工具信息
+    tool_name = db.Column(db.String(100), nullable=False, comment='工具名称')
+    tool_category = db.Column(db.String(50), nullable=False, comment='工具分类')
+    tool_scenario = db.Column(db.String(50), default='other', comment='工具场景')
+    
+    # 输入和输出
+    input_data = db.Column(db.Text, comment='输入数据JSON')
+    output_data = db.Column(db.Text, comment='输出数据JSON')
+    
+    # 执行信息
+    execution_time = db.Column(db.Float, comment='执行时间（毫秒）')
+    status = db.Column(db.String(20), default='success', comment='执行状态: success/fail')
+    error_message = db.Column(db.Text, comment='错误信息')
+    
+    # 标签和保存
+    tags = db.Column(db.Text, comment='标签（逗号分隔）')
+    is_saved = db.Column(db.Boolean, default=False, comment='是否保存')
+    
+    # 时间戳
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, comment='创建时间', index=True)
+    
+    # 关联用户
+    user = db.relationship('User', backref=db.backref('data_factory_history', lazy='dynamic'))
+    
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'username': self.username,
+            'tool_name': self.tool_name,
+            'tool_category': self.tool_category,
+            'tool_scenario': self.tool_scenario,
+            'input_data': self.input_data,
+            'output_data': self.output_data,
+            'execution_time': self.execution_time,
+            'status': self.status,
+            'error_message': self.error_message,
+            'tags': self.tags,
+            'is_saved': self.is_saved,
+            'created_at': self.created_at.isoformat() if self.created_at else None
+        }

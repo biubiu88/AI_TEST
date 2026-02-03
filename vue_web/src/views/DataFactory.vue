@@ -1826,8 +1826,8 @@ const fetchHistory = async () => {
         page_size: historyPageSize.value
       }
     })
-    historyRecords.value = response.data.results
-    historyTotal.value = response.data.count
+    historyRecords.value = response.results
+    historyTotal.value = response.count
   } catch (error) {
     ElMessage.error(t('dataFactory.messages.fetchHistoryFailed'))
   }
@@ -1847,7 +1847,7 @@ const handleHistorySizeChange = (size) => {
 const fetchStatistics = async () => {
   try {
     const response = await api.get('/data-factory/statistics/')
-    statistics.value = response.data
+    statistics.value = response
   } catch (error) {
     ElMessage.error(t('dataFactory.messages.fetchStatsFailed'))
   }

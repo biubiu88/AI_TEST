@@ -14,7 +14,13 @@ def execute_tool():
     """
     执行数据工厂工具
     """
+    import json
+    from datetime import datetime
+    from app.models import DataFactoryHistory
+    from flask_jwt_extended import get_jwt_identity
+    
     try:
+        start_time = datetime.utcnow()
         data = request.get_json()
         if not data:
             return jsonify({'error': '请求数据不能为空'}), 400
@@ -23,9 +29,25 @@ def execute_tool():
         tool_category = data.get('tool_category')
         input_data = data.get('input_data', {})
         tool_scenario = data.get('tool_scenario', 'other')
+        is_saved = bool(data.get('is_saved', False))
+        tags = data.get('tags', '')
+        # 处理 tags 参数：如果是数组，转换为逗号分隔的字符串
+        if isinstance(tags, list):
+            tags = ','.join(tags)
 
         if not tool_name or not tool_category:
             return jsonify({'error': '缺少必要参数: tool_name 或 tool_category'}), 400
+
+        # 获取用户信息
+        user_id = None
+        username = None
+        try:
+            user_info = get_jwt_identity()
+            if user_info:
+                user_id = user_info.get('id')
+                username = user_info.get('username')
+        except Exception:
+            pass
 
         # 根据工具名称和类别执行相应工具
         service = DataFactoryService()
@@ -119,16 +141,63 @@ def execute_tool():
                 # 尝试使用默认参数
                 result = method(**{})
         
+        # 计算执行时间
+        end_time = datetime.utcnow()
+        execution_time = (end_time - start_time).total_seconds() * 1000  # 转换为毫秒
+        
+        # 保存历史记录
+        history = DataFactoryHistory(
+            user_id=user_id,
+            username=username,
+            tool_name=tool_name,
+            tool_category=tool_category,
+            tool_scenario=tool_scenario,
+            input_data=json.dumps(input_data, ensure_ascii=False),
+            output_data=json.dumps(result, ensure_ascii=False),
+            execution_time=execution_time,
+            status='success',
+            tags=tags,
+            is_saved=is_saved
+        )
+        from app import db
+        db.session.add(history)
+        db.session.commit()
+        
         return jsonify({
             'result': result,
             'tool_name': tool_name,
             'tool_category': tool_category,
-            'tool_scenario': tool_scenario
+            'tool_scenario': tool_scenario,
+            'history_id': history.id
         }), 200
 
     except Exception as e:
         print(f"执行工具时发生错误: {str(e)}")
         traceback.print_exc()
+        
+        # 保存失败的历史记录
+        try:
+            from app import db
+            end_time = datetime.utcnow()
+            execution_time = (end_time - start_time).total_seconds() * 1000 if 'start_time' in locals() else None
+            
+            history = DataFactoryHistory(
+                user_id=user_id if 'user_id' in locals() else None,
+                username=username if 'username' in locals() else None,
+                tool_name=tool_name if 'tool_name' in locals() else 'unknown',
+                tool_category=tool_category if 'tool_category' in locals() else 'unknown',
+                tool_scenario=tool_scenario if 'tool_scenario' in locals() else 'other',
+                input_data=json.dumps(input_data, ensure_ascii=False) if 'input_data' in locals() else '{}',
+                execution_time=execution_time,
+                status='fail',
+                error_message=str(e),
+                tags=tags if 'tags' in locals() else ''
+            )
+            db.session.add(history)
+            db.session.commit()
+        except:
+            pass
+        
         return jsonify({'error': f'执行工具时发生错误: {str(e)}'}), 500
 
 
@@ -177,3 +246,100 @@ def get_tools():
         print(f"获取工具列表时发生错误: {str(e)}")
         traceback.print_exc()
         return jsonify({'error': f'获取工具列表时发生错误: {str(e)}'}), 500
+
+
+@data_factory_bp.route('/', methods=['GET'])
+def get_history():
+    """
+    获取历史记录
+    """
+    try:
+        from app.models import DataFactoryHistory
+        from app import db
+        
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('page_size', 10))
+        
+        # 从数据库获取历史记录
+        query = DataFactoryHistory.query.order_by(DataFactoryHistory.created_at.desc())
+        pagination = query.paginate(page=page, per_page=page_size, error_out=False)
+        
+        history_records = [record.to_dict() for record in pagination.items]
+        total_records = pagination.total
+        
+        return jsonify({
+            'results': history_records,
+            'count': total_records
+        }), 200
+
+    except Exception as e:
+        print(f"获取历史记录时发生错误: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': f'获取历史记录时发生错误: {str(e)}'}), 500
+
+
+@data_factory_bp.route('/statistics', methods=['GET'])
+@data_factory_bp.route('/statistics/', methods=['GET'])
+def get_statistics():
+    """
+    获取统计信息
+    """
+    try:
+        from app.models import DataFactoryHistory
+        from app import db
+        from sqlalchemy import func
+        
+        # 获取总记录数
+        total_records = DataFactoryHistory.query.count()
+        
+        # 获取分类统计
+        category_stats = db.session.query(
+            DataFactoryHistory.tool_category,
+            func.count(DataFactoryHistory.id)
+        ).group_by(DataFactoryHistory.tool_category).all()
+        
+        # 获取场景统计
+        scenario_stats = db.session.query(
+            DataFactoryHistory.tool_scenario,
+            func.count(DataFactoryHistory.id)
+        ).group_by(DataFactoryHistory.tool_scenario).all()
+        
+        # 构建统计数据
+        statistics = {
+            'total_records': total_records,
+            'category_stats': dict(category_stats),
+            'scenario_stats': dict(scenario_stats)
+        }
+        
+        return jsonify(statistics), 200
+
+    except Exception as e:
+        print(f"获取统计信息时发生错误: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': f'获取统计信息时发生错误: {str(e)}'}), 500
+
+
+@data_factory_bp.route('/<int:history_id>', methods=['DELETE'])
+def delete_history(history_id):
+    """
+    删除历史记录
+    """
+    try:
+        from app.models import DataFactoryHistory
+        from app import db
+        
+        # 查找历史记录
+        history = DataFactoryHistory.query.get(history_id)
+        if not history:
+            return jsonify({'error': '历史记录不存在'}), 404
+        
+        # 删除历史记录
+        db.session.delete(history)
+        db.session.commit()
+        
+        return jsonify({'message': '删除成功'}), 200
+
+    except Exception as e:
+        print(f"删除历史记录时发生错误: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': f'删除历史记录时发生错误: {str(e)}'}), 500
